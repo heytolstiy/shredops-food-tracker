@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Bebas+Neue&display=swap" rel="stylesheet">
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Fixed ambient glow orbs — pure CSS, no JS -->
+  <div class="orb o1"></div>
+  <div class="orb o2"></div>
+  <div class="orb o3"></div>
+
+  <div class="app">
+    <div id="timeline" class="timeline"></div>
+    <div id="hero-section">
+      <div class="card hero">
+        <div class="sk sk-line sk-w45"></div>
+        <div class="sk sk-num"></div>
+        <div class="sk sk-bar"></div>
+      </div>
+    </div>
+    <div id="macro-section"></div>
+    <div id="water-section"></div>
+    <div id="log-section"></div>
+  </div>
+
+  <!-- Edit modal -->
+  <div id="edit-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+    <div class="modal-card">
+      <p class="modal-title">РЕДАКТИРОВАТЬ</p>
+      <form id="edit-form" novalidate>
+        <div class="modal-grid">
+          <div class="modal-field">
+            <label class="modal-label" for="edit-cal">Калории</label>
+            <div class="modal-input-wrap">
+              <input class="modal-input" id="edit-cal" type="number" min="0" max="9999" placeholder="0">
+              <span class="modal-unit">ккал</span>
+            </div>
+          </div>
+          <div class="modal-field">
+            <label class="modal-label" for="edit-wt">Вес</label>
+            <div class="modal-input-wrap">
+              <input class="modal-input" id="edit-wt" type="number" min="0" max="9999" placeholder="0">
+              <span class="modal-unit">г</span>
+            </div>
+          </div>
+          <div class="modal-field">
+            <label class="modal-label" for="edit-pro">Белки</label>
+            <div class="modal-input-wrap">
+              <input class="modal-input" id="edit-pro" type="number" min="0" max="999" placeholder="0">
+              <span class="modal-unit">г</span>
+            </div>
+          </div>
+          <div class="modal-field">
+            <label class="modal-label" for="edit-fat">Жиры</label>
+            <div class="modal-input-wrap">
+              <input class="modal-input" id="edit-fat" type="number" min="0" max="999" placeholder="0">
+              <span class="modal-unit">г</span>
+            </div>
+          </div>
+          <div class="modal-field modal-field--full">
+            <label class="modal-label" for="edit-car">Углеводы</label>
+            <div class="modal-input-wrap">
+              <input class="modal-input" id="edit-car" type="number" min="0" max="999" placeholder="0">
+              <span class="modal-unit">г</span>
+            </div>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="modal-btn modal-btn--cancel" id="modal-cancel">ОТМЕНА</button>
+          <button type="submit" class="modal-btn modal-btn--save">СОХРАНИТЬ</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
