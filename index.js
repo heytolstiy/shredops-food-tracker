@@ -1,4 +1,18 @@
 require('dotenv').config();
+
+// ── Startup env validation ─────────────────────────────────────────────────
+const REQUIRED_ENV = [
+  'TELEGRAM_BOT_TOKEN',
+  'OPENAI_API_KEY',
+  'SUPABASE_URL',
+  'SUPABASE_KEY',
+];
+const missing = REQUIRED_ENV.filter(k => !process.env[k]);
+if (missing.length) {
+  console.error('❌ Missing required environment variables:', missing.join(', '));
+  process.exit(1);
+}
+
 const express = require('express');
 const cors    = require('cors');
 const path    = require('path');
