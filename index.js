@@ -13,6 +13,7 @@ if (missing.length) {
   process.exit(1);
 }
 
+const crypto  = require('crypto');
 const express = require('express');
 const cors    = require('cors');
 const path    = require('path');
@@ -27,6 +28,71 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'src/webapp')));
+
+// ── Telegram initData verification (HMAC-SHA256) ───────────────────────────
+// Spec: https://core.telegram.org/bots/webapps#validating-data-received-via-the-mini-app
+
+function verifyTelegramInitData(initData, botToken) {
+  const params = new URLSearchParams(initData);
+  const hash   = params.get('hash');
+  if (!hash) return null;
+
+  params.delete('hash');
+
+  const dataCheckString = [...params.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([k, v]) => `${k}=${v}`)
+    .join('\n');
+
+  const secretKey = crypto.createHmac('sha256', 'WebAppData')
+    .update(botToken)
+    .digest();
+
+  const expectedHash = crypto.createHmac('sha256', secretKey)
+    .update(dataCheckString)
+    .digest('hex');
+
+  let valid = false;
+  try {
+    valid = crypto.timingSafeEqual(
+      Buffer.from(hash,         'hex'),
+      Buffer.from(expectedHash, 'hex')
+    );
+  } catch {
+    return null;
+  }
+
+  if (!valid) return null;
+
+  try {
+    const userStr = params.get('user');
+    return userStr ? JSON.parse(userStr) : {};
+  } catch {
+    return null;
+  }
+}
+
+// Applied to every /api/* route.
+// In non-production (local dev with ?uid=), verification is skipped so
+// browser testing via the tunnel remains possible without a live Telegram session.
+function requireTelegramAuth(req, res, next) {
+  if (process.env.NODE_ENV !== 'production') return next();
+
+  const auth = req.headers.authorization;
+  if (!auth?.startsWith('tma ')) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const user = verifyTelegramInitData(auth.slice(4), process.env.TELEGRAM_BOT_TOKEN);
+  if (!user) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  req.telegramUser = user;
+  next();
+}
+
+app.use('/api', requireTelegramAuth);
 
 // Health-check — used by uptime monitors (UptimeRobot, Better Stack, etc.)
 app.get('/ping', (_req, res) => res.send('OK'));

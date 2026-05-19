@@ -10,6 +10,26 @@ const userId =
 
 const $ = id => document.getElementById(id);
 
+/* ── XSS guard — escape all user-controlled strings before innerHTML ──── */
+function esc(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+/* ── Authenticated fetch — attaches Telegram initData on every API call ─ */
+function apiFetch(url, options = {}) {
+  return fetch(url, {
+    ...options,
+    headers: {
+      ...(options.headers || {}),
+      ...(tg.initData ? { 'Authorization': `tma ${tg.initData}` } : {}),
+    },
+  });
+}
+
 /* ── Moscow "today" (UTC+3, no DST) — mirrors server-side todayMSK() ─── */
 function mskToday() {
   return new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
@@ -105,7 +125,7 @@ async function loadData() {
     const url   = activeDate === today
       ? `/api/today/${userId}`
       : `/api/logs/${userId}/${activeDate}`;
-    const res = await fetch(url);
+    const res = await apiFetch(url);
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
       throw new Error(body.error || `HTTP ${res.status}`);
@@ -133,9 +153,9 @@ function heroHTML(user, totals, date) {
       <div class="hero-top">
         <div>
           <p class="hero-date">${fmtDate(date)}</p>
-          ${name ? `<p class="hero-name">${name}</p>` : ''}
+          ${name ? `<p class="hero-name">${esc(name)}</p>` : ''}
         </div>
-        <span class="goal-badge ${GOAL_CLS[user.goal] || 'maintain'}">${GOAL_MAP[user.goal] || user.goal}</span>
+        <span class="goal-badge ${GOAL_CLS[user.goal] || 'maintain'}">${esc(GOAL_MAP[user.goal] || user.goal)}</span>
       </div>
 
       <div class="hero-cal-row">
@@ -221,12 +241,12 @@ function logCard(entry) {
     <div class="log-card" data-log-id="${entry.id}">
       <div class="log-card-inner">
         <div class="lc-top">
-          <span class="lc-name">${name}</span>
+          <span class="lc-name">${esc(name)}</span>
           <span class="lc-time">${fmtTime(entry.logged_at)}</span>
         </div>
         <div class="lc-mid">
           <span class="lc-kcal">${entry.calories} ккал</span>
-          ${weight ? `<span class="lc-weight">${weight}г</span>` : ''}
+          ${weight ? `<span class="lc-weight">${esc(weight)}г</span>` : ''}
         </div>
         <div class="lc-pills">
           <span class="pill">Б <b>${r(entry.protein_g)}</b></span>
@@ -336,7 +356,7 @@ async function logWater(cellEl) {
   if (cellsEl) cellsEl.classList.add('pending');
 
   try {
-    const res = await fetch('/api/water', {
+    const res = await apiFetch('/api/water', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({ userId, amount: 250 }),
@@ -395,7 +415,7 @@ $('edit-form').addEventListener('submit', async e => {
   };
 
   try {
-    const res = await fetch(`/api/logs/${editingLogId}?userId=${userId}`, {
+    const res = await apiFetch(`/api/logs/${editingLogId}?userId=${userId}`, {
       method:  'PUT',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify(body),
@@ -411,7 +431,7 @@ $('edit-form').addEventListener('submit', async e => {
 /* ── Delete ────────────────────────────────────────────────────────────── */
 async function deleteLog(logId) {
   try {
-    const res = await fetch(`/api/logs/${logId}?userId=${userId}`, { method: 'DELETE' });
+    const res = await apiFetch(`/api/logs/${logId}?userId=${userId}`, { method: 'DELETE' });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     loadData();
   } catch (err) {
