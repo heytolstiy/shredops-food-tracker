@@ -25,7 +25,7 @@ const { todayMSK }      = require('./src/utils/time');
 // ── Express API ────────────────────────────────────────────────────────────
 
 const app = express();
-app.use(cors());
+app.use(cors({ origin: process.env.WEBAPP_URL }));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'src/webapp')));
 
@@ -139,7 +139,7 @@ app.get('/api/today/:userId', async (req, res) => {
   });
 });
 
-// POST — log 250 ml of water for today; returns confirmed daily total
+// POST — log water for today; returns confirmed daily total
 app.post('/api/water', async (req, res) => {
   const telegramId = parseInt(req.body.userId, 10);
   const amount     = Math.max(1, Math.round(Number(req.body.amount) || 250));
@@ -148,26 +148,33 @@ app.post('/api/water', async (req, res) => {
 
   const today = todayMSK();
 
+  // Fetch user's water target and current day total in parallel (pre-insert check)
+  const [userRow, existingRows] = await Promise.all([
+    supabase.from('users').select('target_water_ml').eq('telegram_id', telegramId).maybeSingle(),
+    supabase.from('water_logs').select('amount_ml').eq('telegram_id', telegramId).eq('log_date', today),
+  ]);
+
+  const target   = userRow.data?.target_water_ml ?? 2500;
+  const existing = (existingRows.data ?? []).reduce((s, r) => s + (r.amount_ml || 0), 0);
+
+  // Cap at 2× the user's daily target to prevent log flooding
+  if (existing + amount > target * 2) {
+    return res.status(400).json({ error: 'Daily water limit exceeded' });
+  }
+
   const { error: insertError } = await supabase.from('water_logs').insert({
     telegram_id: telegramId,
     log_date:    today,
     amount_ml:   amount,
   });
 
-  if (insertError) return res.status(500).json({ error: insertError.message });
+  if (insertError) {
+    console.error('[/api/water] insert error:', insertError.message);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
 
-  // Return the server-confirmed total so the client needs no further requests
-  const { data: rows, error: sumError } = await supabase
-    .from('water_logs')
-    .select('amount_ml')
-    .eq('telegram_id', telegramId)
-    .eq('log_date', today);
-
-  const waterLogged = sumError
-    ? 0
-    : (rows ?? []).reduce((s, r) => s + (r.amount_ml || 0), 0);
-
-  res.json({ ok: true, waterLogged });
+  // Return computed total — no second DB round-trip needed
+  res.json({ ok: true, waterLogged: existing + amount });
 });
 
 // GET historical data for any MSK date (YYYY-MM-DD)
@@ -227,7 +234,10 @@ app.delete('/api/logs/:id', async (req, res) => {
     .eq('id', logId)
     .eq('telegram_id', telegramId);
 
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) {
+    console.error('[DELETE /api/logs] error:', error.message);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
   res.json({ ok: true });
 });
 
@@ -280,7 +290,10 @@ app.put('/api/logs/:id', async (req, res) => {
     .eq('id', logId)
     .eq('telegram_id', telegramId);
 
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) {
+    console.error('[PUT /api/logs] error:', error.message);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
   res.json({ ok: true });
 });
 

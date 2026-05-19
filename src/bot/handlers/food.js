@@ -119,7 +119,7 @@ async function handleFoodPhoto(ctx) {
 
     return saveAndReply(ctx, nutrition, ctx.message.caption, bestPhoto.file_id);
   } catch (err) {
-    console.error('[food/photo] FULL ERROR:', err);
+    console.error('[food/photo] error:', err.message);
     return ctx.reply('❌ Не удалось проанализировать фото.\n\nУбедись, что на фото видна еда, и попробуй снова.');
   }
 }
@@ -139,7 +139,7 @@ async function handleFoodText(ctx) {
 
     return saveAndReply(ctx, nutrition, text, null);
   } catch (err) {
-    console.error('[food/text] FULL ERROR:', err);
+    console.error('[food/text] error:', err.message);
     return ctx.reply('❌ Не удалось рассчитать КБЖУ.\n\nПопробуй добавить больше деталей, например: «Гречка отварная 200г».');
   }
 }
