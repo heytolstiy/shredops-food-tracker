@@ -5,7 +5,7 @@ const REQUIRED_ENV = [
   'TELEGRAM_BOT_TOKEN',
   'OPENAI_API_KEY',
   'SUPABASE_URL',
-  'SUPABASE_KEY',
+  'SUPABASE_SERVICE_ROLE_KEY',
 ];
 const missing = REQUIRED_ENV.filter(k => !process.env[k]);
 if (missing.length) {
