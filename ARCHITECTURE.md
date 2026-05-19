@@ -1,4 +1,4 @@
-# Architecture Reference
+# Simple Food & Water Tracker in Telegram — Architecture Reference
 
 Technical blueprint for developers and AI sessions maintaining this codebase. Covers every non-obvious decision: why it exists, what it does, and what breaks if you change it.
 
@@ -383,6 +383,25 @@ Total: 2 queries regardless of user count.
 
 All routes are in `index.js`. All user-scoped mutations verify `telegram_id` ownership via `.eq('telegram_id', telegramId)`.
 
+### Authentication middleware
+
+Every `/api/*` route is protected by `requireTelegramAuth`:
+
+```javascript
+app.use('/api', requireTelegramAuth);
+```
+
+In **production** (`NODE_ENV === 'production'`), the middleware requires an `Authorization: tma <initData>` header and verifies the Telegram `initData` HMAC-SHA256 signature:
+
+1. Strip the `hash` field from the URL-encoded `initData` string.
+2. Sort the remaining key=value pairs lexicographically and join with `\n` to form the data-check string.
+3. Derive the secret key: `HMAC-SHA256("WebAppData", TELEGRAM_BOT_TOKEN)`.
+4. Compute `HMAC-SHA256(data_check_string, secret_key)` and compare with `hash` using `crypto.timingSafeEqual` to prevent timing attacks.
+
+Requests that are missing the header, or whose signature does not match, receive `401 Unauthorized`. The parsed `user` object is attached to `req.telegramUser` for downstream use.
+
+In **non-production** (local dev), the middleware is bypassed entirely so browser testing via a tunnel works without a live Telegram session.
+
 ---
 
 ### `GET /ping`
@@ -457,14 +476,18 @@ Logs one water drink and returns the server-confirmed day total. The confirmed t
 
 `amount` is validated with `Math.max(1, Math.round(Number(...)))`. Defaults to 250 if missing.
 
+Before inserting, the endpoint fetches the user's `target_water_ml` and the current day's running total in parallel. If `existing + amount > target * 2`, the request is rejected with `400` (daily cap exceeded). This rate limit check happens **before** the insert — no row is written.
+
+On success, `waterLogged` is computed as `existing + amount` locally — no second DB round-trip needed.
+
 **Response:**
 ```json
 { "ok": true, "waterLogged": 1000 }
 ```
 
-`waterLogged` is the result of `SUM(amount_ml)` for `(telegram_id, log_date)` after the insert — always authoritative.
+`waterLogged` is the server-confirmed day total, used by the client to resolve optimistic UI race conditions.
 
-**Errors:** `400` invalid userId · `500` DB error
+**Errors:** `400` invalid userId · `400` daily water limit exceeded · `500` DB error
 
 ---
 

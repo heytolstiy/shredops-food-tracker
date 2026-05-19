@@ -1,6 +1,6 @@
-# Cybercore Fit-Tracker
+# Simple Food & Water Tracker in Telegram
 
-A Telegram bot + embedded Mini App for calorie and macro tracking. Users log meals by sending food photos or plain text; OpenAI Vision analyzes the image and returns macros in JSON. A gamified cybercore web dashboard renders progress in real time with an infinite historical timeline.
+A Telegram bot + embedded Mini App for calorie, macro, and water tracking. Users log meals by sending food photos or plain text; OpenAI Vision analyzes the image and returns macros in JSON. A web dashboard renders daily progress in real time with a 90-day historical timeline.
 
 ---
 
@@ -21,7 +21,7 @@ A Telegram bot + embedded Mini App for calorie and macro tracking. Users log mea
 ## Project Structure
 
 ```
-food-tracker-bot/
+simple-food-water-tracker/
 ├── index.js                    # Entry point: Express server + bot launch
 ├── database.sql                # Full schema for a fresh Supabase project
 ├── migration_water.sql         # ALTER TABLE migration (adds target_water_ml + water_logs)
@@ -44,7 +44,7 @@ food-tracker-bot/
     │   └── time.js             # todayMSK() — single timezone source of truth
     └── webapp/
         ├── index.html          # Mini App shell (served as static by Express)
-        ├── style.css           # Glassmorphism + cybercore design system
+        ├── style.css           # UI design system
         └── app.js              # Mini App logic: timeline, water, logs, edit/delete
 ```
 
@@ -52,21 +52,22 @@ food-tracker-bot/
 
 ## Environment Variables
 
-Create a `.env` file in the project root. All six keys are required.
+Create a `.env` file in the project root. All variables below are required.
 
 ```env
 TELEGRAM_BOT_TOKEN=          # Bot token from @BotFather
 OPENAI_API_KEY=              # OpenAI API key with gpt-4o-mini access
 SUPABASE_URL=                # Your Supabase project URL (https://xxx.supabase.co)
-SUPABASE_KEY=                # service_role key (not anon) — bypasses RLS
-WEBAPP_URL=                  # Public HTTPS URL of the Mini App (your tunnel or prod host)
-PORT=3000                    # Port for the Express server (optional, defaults to 3000)
+SUPABASE_SERVICE_ROLE_KEY=   # service_role secret key — NOT the anon/public key
+NODE_ENV=production          # Set to "production" to enable strict API auth
+WEBAPP_URL=                  # Public HTTPS URL of the Mini App (used for CORS)
 ```
 
 ### Key notes
 
-- **`SUPABASE_KEY`** must be the `service_role` secret key, not the `anon` public key. The bot writes data server-side, and `service_role` bypasses Row Level Security so no RLS policies need to be configured.
-- **`WEBAPP_URL`** must be a valid public HTTPS URL. Telegram rejects `http://` and `localhost` Mini App URLs. During local development, use a tunnel (see setup below).
+- **`SUPABASE_SERVICE_ROLE_KEY`** must be the `service_role` secret key, not the `anon` public key. The bot writes data server-side, and `service_role` bypasses Row Level Security so no RLS policies need to be configured.
+- **`NODE_ENV=production`** activates strict Telegram `initData` HMAC-SHA256 signature verification on every `/api/*` request. Without it (local dev), the middleware is bypassed so browser testing via a tunnel remains possible without a live Telegram session.
+- **`WEBAPP_URL`** must be a valid public HTTPS URL. It is used to restrict CORS: only requests from this origin are accepted by the Express API. Telegram also rejects `http://` and `localhost` Mini App URLs — use a tunnel during local development (see setup below).
 
 ---
 
@@ -80,11 +81,7 @@ npm install
 
 ### 2. Configure environment
 
-Copy the template and fill in your keys:
-
-```bash
-cp .env.example .env   # or create .env manually
-```
+Create a `.env` file in the project root and fill in your keys (see the table above).
 
 ### 3. Set up the database
 
@@ -138,7 +135,6 @@ Both the Express API and the Telegraf bot start from the same `index.js` entry p
 | `/reset` | Clears current state and re-runs the full 8-step onboarding wizard |
 | `/dashboard` | Sends an inline button that opens the Mini App web dashboard |
 | `/help` | Usage guide for all three logging methods (photo, text, manual) |
-| `/today` | Text summary of today's calorie and macro progress |
 
 ### Logging methods
 
@@ -153,7 +149,7 @@ Both the Express API and the Telegraf bot start from the same `index.js` entry p
 ## Web App (Mini App) Features
 
 - **Hero card** — big calorie number with progress bar, goal badge, surplus/deficit display
-- **Macro grid** — protein / fat / carbs with individual neon progress bars
+- **Macro grid** — protein / fat / carbs with individual progress bars
 - **Water tracker** — gamified power cells (250 ml each), tap to log
 - **Historical timeline** — horizontal scrollable 90-day strip; tap any day to view that date read-only
 - **Food log** — per-entry cards with edit and delete actions (today only)
@@ -161,11 +157,23 @@ Both the Express API and the Telegraf bot start from the same `index.js` entry p
 
 ---
 
+## Security
+
+The production API is secured at multiple layers:
+
+- **Telegram `initData` verification** — every `/api/*` request must include an `Authorization: tma <initData>` header. The server verifies the HMAC-SHA256 signature using the bot token as the secret key, per the [Telegram Mini App spec](https://core.telegram.org/bots/webapps#validating-data-received-via-the-mini-app). Requests with missing or invalid signatures are rejected with `401 Unauthorized`.
+- **Anti-XSS escaping** — all user-supplied strings (food names, usernames, goal labels) are HTML-entity-escaped before being injected into the Mini App DOM.
+- **Water rate limiting** — the `POST /api/water` endpoint enforces a per-user daily cap of `2 × target_water_ml`. Requests that would exceed this limit are rejected with `400` before any DB write occurs.
+- **CORS restriction** — the Express API only accepts cross-origin requests from the `WEBAPP_URL` origin.
+- **Error masking** — internal DB error details are logged server-side only; clients receive a generic `"Internal server error"` string.
+
+---
+
 ## Deployment
 
 The app is a single Node.js process. Any platform that runs Node.js works:
 
-- **Railway / Render / Fly.io** — push repo, set env vars in dashboard, done
-- **VPS** — run with `pm2 start index.js --name fit-tracker`
+- **Railway / Render / Fly.io** — push repo, set env vars in the platform dashboard, deploy
+- **VPS** — run with `pm2 start index.js --name food-tracker`
 
-Set `WEBAPP_URL` to your production domain before deploying. The bot registers the Menu Button automatically on startup via `setChatMenuButton`.
+Set all six environment variables in your platform's dashboard before deploying. The bot registers the Menu Button and command list automatically on startup.
