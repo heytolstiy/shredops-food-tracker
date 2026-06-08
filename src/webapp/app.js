@@ -1,7 +1,9 @@
 /* ── Telegram Web App init ─────────────────────────────────────────────── */
-const tg = window.Telegram.WebApp;
-tg.ready();
-tg.expand();
+// Optional-chain so the app degrades gracefully when the Telegram SDK
+// CDN is unreachable (slow networks, browser testing without Telegram).
+const tg = window.Telegram?.WebApp ?? {};
+tg.ready?.();
+tg.expand?.();
 
 const userId =
   tg.initDataUnsafe?.user?.id ||

@@ -25,7 +25,15 @@ const { todayMSK }      = require('./src/utils/time');
 // ── Express API ────────────────────────────────────────────────────────────
 
 const app = express();
-app.use(cors({ origin: process.env.WEBAPP_URL }));
+// Reflect the request origin so Telegram Mini Apps work in all contexts:
+// native mobile/desktop (same-origin), Telegram Web (cross-origin via
+// web.telegram.org), and browser dev testing with a tunnel URL.
+// API security is enforced by HMAC-SHA256 initData verification, not CORS.
+app.use(cors({
+  origin: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'src/webapp')));
 
@@ -77,6 +85,7 @@ function verifyTelegramInitData(initData, botToken) {
 // browser testing via the tunnel remains possible without a live Telegram session.
 function requireTelegramAuth(req, res, next) {
   if (process.env.NODE_ENV !== 'production') return next();
+  if (req.method === 'OPTIONS') return next(); // CORS preflight — handled by cors() above
 
   const auth = req.headers.authorization;
   if (!auth?.startsWith('tma ')) {
