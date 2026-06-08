@@ -1,6 +1,13 @@
 const { Telegraf, Scenes, session, Markup } = require('telegraf');
 const { onboardingScene } = require('./scenes/onboarding');
-const { handleFoodPhoto, handleFoodText, handleManualEntry } = require('./handlers/food');
+const {
+  handleFoodPhoto,
+  handleFoodText,
+  handleManualEntry,
+  handleConfirmLog,
+  handleCancelLog,
+  handleCorrectionText,
+} = require('./handlers/food');
 const { supabase }   = require('../db/supabase');
 const { todayMSK }   = require('../utils/time');
 
@@ -215,6 +222,11 @@ bot.command(['dashboard', 'дашборд'], async (ctx) => {
   );
 });
 
+// ── inline button actions ───────────────────────────────────────────────────
+
+bot.action('confirm_log', handleConfirmLog);
+bot.action('cancel_log',  handleCancelLog);
+
 // ── photo handler ──────────────────────────────────────────────────────────
 
 bot.on('photo', async (ctx) => {
@@ -231,12 +243,18 @@ bot.on('photo', async (ctx) => {
   return handleFoodPhoto(ctx);
 });
 
-// ── text-only food logging ──────────────────────────────────────────────────
-// Fires for plain text messages that are not commands and not inside a scene.
+// ── text handler ────────────────────────────────────────────────────────────
+// Priority: correction of pending log → manual entry → AI food analysis.
 
 bot.on('text', async (ctx) => {
   const text = ctx.message.text.trim();
   if (text.startsWith('/')) return;
+
+  // If a pending preview exists, any text is a correction — skip DB check
+  // because the user is already onboarded (they got the preview).
+  if (ctx.session?.pendingLog) {
+    return handleCorrectionText(ctx);
+  }
 
   const { data: user } = await supabase
     .from('users')
