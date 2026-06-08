@@ -138,17 +138,18 @@ async function sendPreview(ctx, nutrition, originalText, photoFileId) {
   };
 }
 
+// ── Image download helper ───────────────────────────────────────────────────
+
+async function fetchImageAsBase64(url) {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`Failed to fetch image: ${response.status}`);
+  const buffer = await response.arrayBuffer();
+  return Buffer.from(buffer).toString('base64');
+}
+
 // ── Photo handler ───────────────────────────────────────────────────────────
 
 async function handleFoodPhoto(ctx) {
-  if (!ctx.message.caption) {
-    return ctx.reply(
-      '⚠️ Пожалуйста, добавь описание еды и примерный вес в граммах.\n\n' +
-      'Пример: отправь фото с подписью «200г куриная грудка с рисом»\n\n' +
-      'Или просто напиши название блюда текстом — фото необязательно.',
-    );
-  }
-
   await ctx.sendChatAction('typing');
 
   try {
@@ -158,13 +159,17 @@ async function handleFoodPhoto(ctx) {
 
     await ctx.sendChatAction('typing');
 
-    const nutrition = await analyzeFood(fileLink.href, ctx.message.caption);
+    const base64Image = await fetchImageAsBase64(fileLink.href);
+    const caption     = ctx.message.caption ?? null;
+    const nutrition   = await analyzeFood(base64Image, caption);
 
     if (!nutrition.is_food) {
       return ctx.reply(NON_FOOD_REPLY, { parse_mode: 'HTML' });
     }
 
-    return sendPreview(ctx, nutrition, ctx.message.caption, bestPhoto.file_id);
+    // Use caption as description if provided, otherwise fall back to AI-identified name
+    const description = caption ?? nutrition.identified_food;
+    return sendPreview(ctx, nutrition, description, bestPhoto.file_id);
   } catch (err) {
     console.error('[food/photo] error:', err.message);
     return ctx.reply('❌ Не удалось проанализировать фото.\n\nУбедись, что на фото видна еда, и попробуй снова.');
