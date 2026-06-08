@@ -306,11 +306,8 @@ app.put('/api/logs/:id', async (req, res) => {
   res.json({ ok: true });
 });
 
-const port = process.env.PORT || 3000;
-console.log(`[system] Starting — binding to 0.0.0.0:${port}`);
-
-const server = app.listen(port, '0.0.0.0', () => {
-  console.log(`[system] Express server listening on 0.0.0.0:${port}`);
+const server = app.listen(3000, '0.0.0.0', () => {
+  console.log(`[system] Express server listening on 0.0.0.0:3000`);
 });
 
 server.on('error', (err) => {
