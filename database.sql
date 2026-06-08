@@ -29,6 +29,9 @@ CREATE TABLE IF NOT EXISTS users (
   daily_fat_g         INTEGER NOT NULL,
   daily_carbs_g       INTEGER NOT NULL,
   target_water_ml     INTEGER DEFAULT 2500,  -- added: migration_water.sql
+  current_streak      INTEGER NOT NULL DEFAULT 0,
+  max_streak          INTEGER NOT NULL DEFAULT 0,
+  last_log_date       DATE,
   onboarding_complete BOOLEAN DEFAULT FALSE,
   created_at          TIMESTAMPTZ DEFAULT NOW(),
   updated_at          TIMESTAMPTZ DEFAULT NOW()

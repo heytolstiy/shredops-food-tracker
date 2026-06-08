@@ -6,4 +6,8 @@ function todayMSK() {
   return new Date(Date.now() + MSK_OFFSET_MS).toISOString().slice(0, 10);
 }
 
-module.exports = { todayMSK };
+function yesterdayMSK() {
+  return new Date(Date.now() + MSK_OFFSET_MS - 86_400_000).toISOString().slice(0, 10);
+}
+
+module.exports = { todayMSK, yesterdayMSK };

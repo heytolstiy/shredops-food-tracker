@@ -116,7 +116,7 @@ app.get('/api/today/:userId', async (req, res) => {
   const [userResult, logsResult, waterResult] = await Promise.all([
     supabase
       .from('users')
-      .select('daily_calories, daily_protein_g, daily_fat_g, daily_carbs_g, first_name, username, goal, target_water_ml')
+      .select('daily_calories, daily_protein_g, daily_fat_g, daily_carbs_g, first_name, username, goal, target_water_ml, current_streak, max_streak')
       .eq('telegram_id', userId)
       .maybeSingle(),
     supabase
@@ -198,7 +198,7 @@ app.get('/api/logs/:userId/:date', async (req, res) => {
   const [userResult, logsResult, waterResult] = await Promise.all([
     supabase
       .from('users')
-      .select('daily_calories, daily_protein_g, daily_fat_g, daily_carbs_g, first_name, username, goal, target_water_ml')
+      .select('daily_calories, daily_protein_g, daily_fat_g, daily_carbs_g, first_name, username, goal, target_water_ml, current_streak, max_streak')
       .eq('telegram_id', userId)
       .maybeSingle(),
     supabase

@@ -65,6 +65,26 @@ const GOAL_MAP = { lose: 'Похудение', maintain: 'Поддержание
 const GOAL_CLS = { lose: 'lose',      maintain: 'maintain',    gain: 'gain'         };
 const RU_DAYS  = ['ВС','ПН','ВТ','СР','ЧТ','ПТ','СБ'];
 
+/* ── Tier system — 4 levels based on current streak ────────────────────── */
+const TIERS = [
+  { min: 14, n: 4, label: 'ЛЕГЕНДА',  icon: '🏆', color: '#ff2d78', glow: 'rgba(255,45,120,0.55)',  bg: 'rgba(255,45,120,0.08)' },
+  { min:  7, n: 3, label: 'МАСТЕР',   icon: '⚡', color: '#9b5cf6', glow: 'rgba(155,92,246,0.55)', bg: 'rgba(155,92,246,0.08)' },
+  { min:  3, n: 2, label: 'БОЕЦ',     icon: '💪', color: '#00aaff', glow: 'rgba(0,170,255,0.55)',  bg: 'rgba(0,170,255,0.08)'  },
+  { min:  0, n: 1, label: 'НОВИЧОК',  icon: '🌱', color: '#00ff66', glow: 'rgba(0,255,102,0.45)', bg: 'rgba(0,255,102,0.07)'  },
+];
+
+function getTier(streak) {
+  return TIERS.find(t => streak >= t.min) ?? TIERS[TIERS.length - 1];
+}
+
+function ruDays(n) {
+  const mod10 = n % 10, mod100 = n % 100;
+  if (mod100 >= 11 && mod100 <= 19) return 'дней';
+  if (mod10 === 1) return 'день';
+  if (mod10 >= 2 && mod10 <= 4) return 'дня';
+  return 'дней';
+}
+
 /* ── Timeline: 90-day horizontal strip ────────────────────────────────── */
 function buildTimeline() {
   const today = mskToday();
@@ -140,24 +160,46 @@ async function loadData() {
 
 /* ── Render: hero ──────────────────────────────────────────────────────── */
 function heroHTML(user, totals, date) {
-  const target = user.daily_calories || 1;
-  const pct    = clamp(r(totals.cal / target * 100), 0, 100);
-  const over   = totals.cal > target;
-  const diff   = Math.abs(target - totals.cal);
-  const name   = tg.initDataUnsafe?.user?.first_name || user.first_name || '';
+  const target  = user.daily_calories || 1;
+  const pct     = clamp(r(totals.cal / target * 100), 0, 100);
+  const over    = totals.cal > target;
+  const diff    = Math.abs(target - totals.cal);
+  const name    = tg.initDataUnsafe?.user?.first_name || user.first_name || '';
+  const streak  = user.current_streak || 0;
+  const maxStr  = user.max_streak     || 0;
+  const tier    = getTier(streak);
 
   const remainHtml = over
     ? `<span class="surplus">+${diff} лишних</span>`
     : `<span class="remain">${diff} осталось</span>`;
 
+  // Show personal record badge only when max beats current (historical context)
+  const recordBadge = maxStr > streak
+    ? `<span class="streak-max">рекорд&nbsp;${maxStr}</span>`
+    : '';
+
   return `
     <div class="card hero">
       <div class="hero-top">
-        <div>
-          <p class="hero-date">${fmtDate(date)}</p>
-          ${name ? `<p class="hero-name">${esc(name)}</p>` : ''}
+        <div class="hero-top-left">
+          <div class="hero-avatar"
+               style="--tier-color:${tier.color};--tier-glow:${tier.glow};--tier-bg:${tier.bg}">
+            <span class="hero-avatar-icon">${tier.icon}</span>
+            <span class="hero-avatar-tier">T${tier.n}&nbsp;${tier.label}</span>
+          </div>
+          <div>
+            <p class="hero-date">${fmtDate(date)}</p>
+            ${name ? `<p class="hero-name">${esc(name)}</p>` : ''}
+          </div>
         </div>
         <span class="goal-badge ${GOAL_CLS[user.goal] || 'maintain'}">${esc(GOAL_MAP[user.goal] || user.goal)}</span>
+      </div>
+
+      <div class="hero-streak">
+        <span class="streak-flame">🔥</span>
+        <span class="streak-count">${streak}</span>
+        <span class="streak-label">${ruDays(streak)} подряд</span>
+        ${recordBadge}
       </div>
 
       <div class="hero-cal-row">

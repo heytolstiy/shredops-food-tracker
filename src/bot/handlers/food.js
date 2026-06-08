@@ -1,7 +1,7 @@
 const { Markup }     = require('telegraf');
 const { supabase }   = require('../../db/supabase');
 const { analyzeFood, analyzeFoodCorrection } = require('../../services/vision');
-const { todayMSK }   = require('../../utils/time');
+const { todayMSK, yesterdayMSK } = require('../../utils/time');
 
 const NON_FOOD_REPLY =
   '⚠️ Объект не распознан как еда.\n\n' +
@@ -196,6 +196,38 @@ async function handleFoodText(ctx) {
   }
 }
 
+// ── Streak update ────────────────────────────────────────────────────────────
+// Called after every successful food log commit.
+// Rules (all dates are MSK YYYY-MM-DD strings):
+//   last_log_date == today      → no change (multiple meals same day)
+//   last_log_date == yesterday  → increment; update max if beaten
+//   anything older or NULL      → reset to 1; retain historical max
+
+async function updateStreak(telegramId, today) {
+  const yesterday = yesterdayMSK();
+
+  const { data: user, error } = await supabase
+    .from('users')
+    .select('current_streak, max_streak, last_log_date')
+    .eq('telegram_id', telegramId)
+    .maybeSingle();
+
+  if (error || !user) return;
+
+  // Normalise: Supabase returns DATE as "YYYY-MM-DD" string, but guard anyway
+  const lastDate = user.last_log_date ? String(user.last_log_date).slice(0, 10) : null;
+
+  if (lastDate === today) return; // already counted today
+
+  const newStreak = (lastDate === yesterday) ? user.current_streak + 1 : 1;
+  const newMax    = Math.max(newStreak, user.max_streak);
+
+  await supabase
+    .from('users')
+    .update({ current_streak: newStreak, max_streak: newMax, last_log_date: today })
+    .eq('telegram_id', telegramId);
+}
+
 // ── Action: confirm ──────────────────────────────────────────────────────────
 
 async function handleConfirmLog(ctx) {
@@ -213,6 +245,11 @@ async function handleConfirmLog(ctx) {
   if (!saved) {
     return ctx.editMessageText('❌ Ошибка при сохранении. Попробуй ещё раз.');
   }
+
+  // Non-critical: streak failure must never block the food log confirmation
+  await updateStreak(saved.telegramId, saved.today).catch(err =>
+    console.error('[streak] update error:', err.message)
+  );
 
   const totalsText = await buildTotalsText(saved.telegramId, saved.today, nutrition);
   return ctx.editMessageText(totalsText, {
