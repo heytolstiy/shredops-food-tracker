@@ -72,9 +72,21 @@ CREATE INDEX IF NOT EXISTS idx_water_logs_telegram_date
   ON water_logs(telegram_id, log_date);
 
 
+-- ── BOT SESSIONS ─────────────────────────────────────────────────────────────
+-- Persists Telegraf session state (pendingLog, onboarding step) across bot
+-- restarts. Without this, Railway redeploys wipe in-memory sessions and users
+-- lose pending food previews between the preview message and their correction.
+CREATE TABLE IF NOT EXISTS bot_sessions (
+  session_key  TEXT PRIMARY KEY,
+  session_data JSONB NOT NULL DEFAULT '{}',
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+
 -- ── ROW LEVEL SECURITY ────────────────────────────────────────────────────────
 -- Enabled for safety. The bot uses the service_role key which bypasses RLS,
 -- so this does not affect bot functionality but blocks direct anon access.
-ALTER TABLE users      ENABLE ROW LEVEL SECURITY;
-ALTER TABLE food_logs  ENABLE ROW LEVEL SECURITY;
-ALTER TABLE water_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE users        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE food_logs    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE water_logs   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE bot_sessions ENABLE ROW LEVEL SECURITY;

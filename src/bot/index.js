@@ -13,11 +13,43 @@ const { todayMSK }   = require('../utils/time');
 
 const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
 
+// ── Supabase-backed session store ──────────────────────────────────────────
+// Persists session across bot restarts so pendingLog (food preview) survives
+// Railway deploys and the user can still send corrections after a restart.
+
+const sessionStore = {
+  async get(key) {
+    const { data } = await supabase
+      .from('bot_sessions')
+      .select('session_data')
+      .eq('session_key', key)
+      .maybeSingle();
+    return data?.session_data ?? undefined;
+  },
+  async set(key, val) {
+    await supabase
+      .from('bot_sessions')
+      .upsert(
+        { session_key: key, session_data: val, updated_at: new Date().toISOString() },
+        { onConflict: 'session_key' },
+      );
+  },
+  async delete(key) {
+    await supabase.from('bot_sessions').delete().eq('session_key', key);
+  },
+};
+
 // ── middleware ─────────────────────────────────────────────────────────────
 
 const stage = new Scenes.Stage([onboardingScene]);
-bot.use(session());
+bot.use(session({ store: sessionStore }));
 bot.use(stage.middleware());
+
+// ── global error handler ───────────────────────────────────────────────────
+
+bot.catch((err, ctx) => {
+  console.error(`[bot] Unhandled error (${ctx.updateType}):`, err.message ?? err);
+});
 
 // ── /start ─────────────────────────────────────────────────────────────────
 

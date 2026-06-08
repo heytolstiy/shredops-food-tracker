@@ -297,34 +297,76 @@ app.put('/api/logs/:id', async (req, res) => {
   res.json({ ok: true });
 });
 
-app.listen(3000, () => console.log('🌐 Web App server → http://localhost:3000'));
+const port = process.env.PORT || 3000;
+console.log(`[system] Starting — binding to 0.0.0.0:${port}`);
+
+const server = app.listen(port, '0.0.0.0', () => {
+  console.log(`[system] Express server listening on 0.0.0.0:${port}`);
+});
+
+server.on('error', (err) => {
+  console.error('[system] Express server failed to bind:', err.message);
+  process.exit(1);
+});
 
 // ── Telegraf Bot ───────────────────────────────────────────────────────────
 
-bot.launch().then(async () => {
-  console.log('✅ Bot is fully running...');
+let botRunning = false;
 
-  // Register slash command autocomplete list
-  await bot.telegram.setMyCommands([
-    { command: 'start',     description: 'Перезапуск бота' },
-    { command: 'dashboard', description: 'Открыть матрицу КБЖУ' },
-    { command: 'profile',   description: 'Настроить цели и параметры' },
-    { command: 'help',      description: 'Справка по вводу' },
-  ]).catch(err => console.error('[commands] setMyCommands error:', err.message));
+async function startBot(retries = 5) {
+  try {
+    await bot.launch({ dropPendingUpdates: true });
+    botRunning = true;
+    console.log('[system] Bot polling started.');
 
-  // Set persistent Web App button next to the input field
-  if (process.env.WEBAPP_URL) {
-    await bot.telegram.setChatMenuButton({
-      menu_button: {
-        type: 'web_app',
-        text: 'Дашборд',
-        web_app: { url: process.env.WEBAPP_URL },
-      },
-    }).catch(err => console.error('[menu-button] setChatMenuButton error:', err.message));
+    bot.telegram.setMyCommands([
+      { command: 'start',     description: 'Перезапуск бота' },
+      { command: 'dashboard', description: 'Открыть матрицу КБЖУ' },
+      { command: 'profile',   description: 'Настроить цели и параметры' },
+      { command: 'help',      description: 'Справка по вводу' },
+    ]).catch(err => console.error('[commands] setMyCommands error:', err.message));
+
+    if (process.env.WEBAPP_URL) {
+      bot.telegram.setChatMenuButton({
+        menu_button: {
+          type:    'web_app',
+          text:    'Дашборд',
+          web_app: { url: process.env.WEBAPP_URL },
+        },
+      }).catch(err => console.error('[menu-button] setChatMenuButton error:', err.message));
+    }
+
+    initScheduler(bot);
+  } catch (err) {
+    const is409 = err.response?.error_code === 409 || String(err.message).includes('409');
+    if (is409 && retries > 0) {
+      console.log(`[system] 409 Conflict — old session still active. Retry in 5s... (${retries} left)`);
+      setTimeout(() => startBot(retries - 1), 5000);
+    } else {
+      console.error('[system] Fatal bot launch error:', err.message ?? err);
+    }
   }
+}
 
-  initScheduler(bot);
-});
+startBot();
 
-process.once('SIGINT',  () => bot.stop('SIGINT'));
-process.once('SIGTERM', () => bot.stop('SIGTERM'));
+function shutdown(signal) {
+  console.log(`[system] ${signal} received — shutting down`);
+  if (botRunning) {
+    try { bot.stop(signal); } catch (e) {
+      console.log('[system] bot.stop() skipped:', e.message);
+    }
+  }
+  server.close(() => {
+    console.log('[system] HTTP server closed. Exiting.');
+    process.exit(0);
+  });
+  // Force-exit after 10 s so keep-alive connections don't block shutdown on Railway
+  setTimeout(() => {
+    console.log('[system] Forced exit after 10 s timeout.');
+    process.exit(1);
+  }, 10_000).unref();
+}
+
+process.once('SIGINT',  () => shutdown('SIGINT'));
+process.once('SIGTERM', () => shutdown('SIGTERM'));

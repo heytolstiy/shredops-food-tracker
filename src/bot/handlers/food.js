@@ -250,13 +250,19 @@ async function handleCorrectionText(ctx) {
 
     ctx.session.pendingLog = { ...pending, nutrition: updated };
 
-    return ctx.telegram.editMessageText(
-      ctx.chat.id,
-      pending.previewMessageId,
-      undefined,
-      buildPreviewText(updated),
-      { parse_mode: 'HTML', ...previewKeyboard() },
-    );
+    try {
+      await ctx.telegram.editMessageText(
+        ctx.chat.id,
+        pending.previewMessageId,
+        undefined,
+        buildPreviewText(updated),
+        { parse_mode: 'HTML', ...previewKeyboard() },
+      );
+    } catch (editErr) {
+      // Message was deleted or stale — send a fresh preview instead
+      console.warn('[food/correction] edit failed, re-sending preview:', editErr.message);
+      await sendPreview(ctx, updated, pending.originalText, pending.photoFileId);
+    }
   } catch (err) {
     console.error('[food/correction] error:', err.message);
     return ctx.reply('❌ Не удалось пересчитать. Попробуй переформулировать правку.');
