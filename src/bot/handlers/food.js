@@ -94,24 +94,33 @@ async function buildTotalsText(telegramId, today, nutrition) {
     { calories: 0, protein: 0, fat: 0, carbs: 0 },
   );
 
-  const user = userResult.data;
-  const rem  = {
-    calories: (user?.daily_calories  ?? 0) - totals.calories,
+  const user   = userResult.data;
+  const target = user?.daily_calories ?? 0;
+  const rem    = {
+    calories: target - totals.calories,
     protein:  (user?.daily_protein_g ?? 0) - totals.protein,
     fat:      (user?.daily_fat_g     ?? 0) - totals.fat,
     carbs:    (user?.daily_carbs_g   ?? 0) - totals.carbs,
   };
   const w = (nutrition.assumed_weight_g ?? 0) > 0 ? ` (${nutrition.assumed_weight_g}г)` : '';
 
+  // Congratulate exactly once: this specific meal pushed the daily total to/past target.
+  const prevTotal   = totals.calories - nutrition.calories;
+  const goalJustHit = target > 0 && totals.calories >= target && prevTotal < target;
+  const congrats    = goalJustHit
+    ? `\n\n🎉 Дневная норма выполнена! Всё, ты красавчик — так держать.`
+    : '';
+
   return (
     `✅ Записано: ${nutrition.identified_food}${w} — ${nutrition.calories} ккал\n` +
     `Б ${nutrition.protein}г · Ж ${nutrition.fat}г · У ${nutrition.carbs}г\n\n` +
-    `📊 Итого за сегодня: ${totals.calories} / ${user?.daily_calories ?? '?'} ккал\n\n` +
+    `📊 Итого за сегодня: ${totals.calories} / ${target || '?'} ккал\n\n` +
     `Остаток на день:\n` +
     `🔥 Калории: ${sign(rem.calories)} ккал\n` +
     `🥩 Белки:   ${sign(rem.protein)} г\n` +
     `🧈 Жиры:    ${sign(rem.fat)} г\n` +
-    `🍞 Углеводы: ${sign(rem.carbs)} г`
+    `🍞 Углеводы: ${sign(rem.carbs)} г` +
+    congrats
   );
 }
 

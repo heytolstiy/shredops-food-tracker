@@ -81,7 +81,54 @@ async function inactivityCheck(bot) {
   }
 }
 
-// ── JOB 3 — Evening Summary — 23:00 MSK ────────────────────────────────────
+// ── JOB 3 — Streak Reminder — 21:00 MSK ────────────────────────────────────
+// Uses last_log_date from users table (set by updateStreak on every commit).
+// Only pings users who haven't logged anything today — one message, no repeat.
+
+function ruDays(n) {
+  const m10 = n % 10, m100 = n % 100;
+  if (m100 >= 11 && m100 <= 19) return 'дней';
+  if (m10 === 1) return 'день';
+  if (m10 >= 2 && m10 <= 4) return 'дня';
+  return 'дней';
+}
+
+async function streakReminder(bot) {
+  const today = todayMSK();
+
+  const { data: users, error } = await supabase
+    .from('users')
+    .select('telegram_id, first_name, current_streak, last_log_date')
+    .eq('onboarding_complete', true);
+
+  if (error) {
+    console.error('[scheduler/streak-reminder] DB error:', error.message);
+    return;
+  }
+
+  const silent = (users ?? []).filter(u => {
+    const d = u.last_log_date ? String(u.last_log_date).slice(0, 10) : null;
+    return d !== today;
+  });
+
+  console.log(`[scheduler/streak-reminder] → ${silent.length} silent user(s) of ${(users ?? []).length}`);
+
+  for (const u of silent) {
+    const name   = u.first_name ? `, ${u.first_name}` : '';
+    const streak = u.current_streak || 0;
+
+    const text = streak > 0
+      ? `Эй${name}, кажется, ты сегодня забыл записать еду 🍽\n\n` +
+        `Стрик ${streak} ${ruDays(streak)} сгорит в полночь, если не залогируешь хотя бы один приём. ` +
+        `Давай быстро закинем, пока не поздно 🔥`
+      : `Эй${name}, кажется, ты сегодня забыл записать еду 🍽\n\n` +
+        `Давай быстро занесём что-нибудь — отправь фото или напиши название блюда.`;
+
+    await send(bot, u.telegram_id, text);
+  }
+}
+
+// ── JOB 4 — Evening Summary — 23:00 MSK ────────────────────────────────────
 // One query for all today's logs → aggregate in JS → one message per user.
 
 async function eveningSummary(bot) {
@@ -155,9 +202,10 @@ function initScheduler(bot) {
 
   cron.schedule('0 9     * * *', () => morningBrief(bot),    opts); // 09:00 MSK
   cron.schedule('0 16,20 * * *', () => inactivityCheck(bot), opts); // 16:00 & 20:00 MSK
+  cron.schedule('0 21    * * *', () => streakReminder(bot),  opts); // 21:00 MSK
   cron.schedule('0 23    * * *', () => eveningSummary(bot),  opts); // 23:00 MSK
 
-  console.log(`✅ Scheduler running (TZ: ${TZ}) — jobs: 09:00 / 16:00 / 20:00 / 23:00 MSK`);
+  console.log(`✅ Scheduler running (TZ: ${TZ}) — jobs: 09:00 / 16:00 / 20:00 / 21:00 / 23:00 MSK`);
 }
 
 module.exports = { initScheduler };
