@@ -111,8 +111,8 @@ async function buildTotalsText(telegramId, today, nutrition) {
 
   // Congratulate exactly once: this specific meal pushed the daily total to/past target.
   // Cast to Number defensively — session may carry stringy values after a correction round-trip.
-  const mealCal   = Number(nutrition.calories);
-  const prevTotal = totals.calories - mealCal;
+  const mealCal     = Number(nutrition.calories);
+  const prevTotal   = totals.calories - mealCal;
   const goalJustHit = target > 0 && totals.calories >= target && prevTotal < target;
 
   console.log(
@@ -120,11 +120,7 @@ async function buildTotalsText(telegramId, today, nutrition) {
     ` prevTotal=${prevTotal} target=${target} goalJustHit=${goalJustHit}`
   );
 
-  const congrats = goalJustHit
-    ? `\n\n🎉 Дневная норма выполнена! Всё, ты красавчик — так держать.`
-    : '';
-
-  return (
+  const text = (
     `✅ Записано: ${nutrition.identified_food}${w} — ${nutrition.calories} ккал\n` +
     `Б ${nutrition.protein}г · Ж ${nutrition.fat}г · У ${nutrition.carbs}г\n\n` +
     `📊 Итого за сегодня: ${totals.calories} / ${target || '?'} ккал\n\n` +
@@ -132,9 +128,10 @@ async function buildTotalsText(telegramId, today, nutrition) {
     `🔥 Калории: ${sign(rem.calories)} ккал\n` +
     `🥩 Белки:   ${sign(rem.protein)} г\n` +
     `🧈 Жиры:    ${sign(rem.fat)} г\n` +
-    `🍞 Углеводы: ${sign(rem.carbs)} г` +
-    congrats
+    `🍞 Углеводы: ${sign(rem.carbs)} г`
   );
+
+  return { text, goalJustHit };
 }
 
 // ── Send preview (no DB write yet) ──────────────────────────────────────────
@@ -273,11 +270,21 @@ async function handleConfirmLog(ctx) {
     console.error('[streak] update error:', err.message)
   );
 
-  const totalsText = await buildTotalsText(saved.telegramId, saved.today, nutrition);
-  return ctx.editMessageText(totalsText, {
+  const { text: totalsText, goalJustHit } = await buildTotalsText(saved.telegramId, saved.today, nutrition);
+
+  await ctx.editMessageText(totalsText, {
     parse_mode:   'HTML',
     reply_markup: { inline_keyboard: [] },
   });
+
+  if (goalJustHit) {
+    console.log(`DEBUG: Попытка отправить сообщение в чат ${ctx.chat.id}`);
+    try {
+      await ctx.reply('🎉 Дневная норма выполнена! Всё, ты красавчик — так держать.');
+    } catch (err) {
+      console.error(`DEBUG: sendMessage failed for chat ${ctx.chat.id}:`, err.message);
+    }
+  }
 }
 
 // ── Action: cancel ───────────────────────────────────────────────────────────
@@ -374,8 +381,17 @@ async function handleManualEntry(ctx) {
     return ctx.reply('❌ Не удалось сохранить запись. Попробуй ещё раз.');
   }
 
-  const reply = await buildTotalsText(saved.telegramId, saved.today, nutrition);
-  return ctx.reply(reply, { parse_mode: 'HTML' });
+  const { text: totalsText, goalJustHit } = await buildTotalsText(saved.telegramId, saved.today, nutrition);
+  await ctx.reply(totalsText, { parse_mode: 'HTML' });
+
+  if (goalJustHit) {
+    console.log(`DEBUG: Попытка отправить сообщение в чат ${ctx.chat.id}`);
+    try {
+      await ctx.reply('🎉 Дневная норма выполнена! Всё, ты красавчик — так держать.');
+    } catch (err) {
+      console.error(`DEBUG: sendMessage failed for chat ${ctx.chat.id}:`, err.message);
+    }
+  }
 }
 
 module.exports = {

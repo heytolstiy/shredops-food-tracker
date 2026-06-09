@@ -254,6 +254,18 @@ bot.command(['dashboard', 'дашборд'], async (ctx) => {
   );
 });
 
+// ── /test_msg — connectivity smoke test ────────────────────────────────────
+
+bot.command('test_msg', async (ctx) => {
+  console.log(`DEBUG: /test_msg вызван из чата ${ctx.chat.id} пользователем ${ctx.from.id}`);
+  try {
+    await ctx.reply('Связь работает ✅');
+    console.log(`DEBUG: /test_msg — сообщение доставлено в чат ${ctx.chat.id}`);
+  } catch (err) {
+    console.error(`DEBUG: /test_msg — sendMessage failed for chat ${ctx.chat.id}:`, err.message);
+  }
+});
+
 // ── inline button actions ───────────────────────────────────────────────────
 
 bot.action('confirm_log', handleConfirmLog);
