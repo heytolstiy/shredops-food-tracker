@@ -81,7 +81,12 @@ async function buildTotalsText(telegramId, today, nutrition) {
   ]);
 
   if (logsResult.error) {
+    console.error('[food/totals] logs query error:', logsResult.error.message);
     return `✅ Записано: ${nutrition.identified_food} (${nutrition.calories} ккал)`;
+  }
+
+  if (userResult.error) {
+    console.error('[food/totals] user query error:', userResult.error.message);
   }
 
   const totals = (logsResult.data ?? []).reduce(
@@ -105,9 +110,17 @@ async function buildTotalsText(telegramId, today, nutrition) {
   const w = (nutrition.assumed_weight_g ?? 0) > 0 ? ` (${nutrition.assumed_weight_g}г)` : '';
 
   // Congratulate exactly once: this specific meal pushed the daily total to/past target.
-  const prevTotal   = totals.calories - nutrition.calories;
+  // Cast to Number defensively — session may carry stringy values after a correction round-trip.
+  const mealCal   = Number(nutrition.calories);
+  const prevTotal = totals.calories - mealCal;
   const goalJustHit = target > 0 && totals.calories >= target && prevTotal < target;
-  const congrats    = goalJustHit
+
+  console.log(
+    `[food/goal-check] uid=${telegramId} mealCal=${mealCal} totalCal=${totals.calories}` +
+    ` prevTotal=${prevTotal} target=${target} goalJustHit=${goalJustHit}`
+  );
+
+  const congrats = goalJustHit
     ? `\n\n🎉 Дневная норма выполнена! Всё, ты красавчик — так держать.`
     : '';
 
