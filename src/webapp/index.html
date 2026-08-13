@@ -82,6 +82,49 @@
     </div>
   </div>
 
+  <!-- Targets modal — manual daily calorie/macro correction -->
+  <div id="targets-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+    <div class="modal-card">
+      <p class="modal-title">ЦЕЛИ НА ДЕНЬ</p>
+      <form id="targets-form" novalidate>
+        <div class="modal-grid">
+          <div class="modal-field">
+            <label class="modal-label" for="targets-cal">Калории</label>
+            <div class="modal-input-wrap">
+              <input class="modal-input" id="targets-cal" type="number" min="0" max="9999" placeholder="0">
+              <span class="modal-unit">ккал</span>
+            </div>
+          </div>
+          <div class="modal-field">
+            <label class="modal-label" for="targets-pro">Белки</label>
+            <div class="modal-input-wrap">
+              <input class="modal-input" id="targets-pro" type="number" min="0" max="999" placeholder="0">
+              <span class="modal-unit">г</span>
+            </div>
+          </div>
+          <div class="modal-field">
+            <label class="modal-label" for="targets-fat">Жиры</label>
+            <div class="modal-input-wrap">
+              <input class="modal-input" id="targets-fat" type="number" min="0" max="999" placeholder="0">
+              <span class="modal-unit">г</span>
+            </div>
+          </div>
+          <div class="modal-field modal-field--full">
+            <label class="modal-label" for="targets-car">Углеводы</label>
+            <div class="modal-input-wrap">
+              <input class="modal-input" id="targets-car" type="number" min="0" max="999" placeholder="0">
+              <span class="modal-unit">г</span>
+            </div>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="modal-btn modal-btn--cancel" id="targets-modal-cancel">ОТМЕНА</button>
+          <button type="submit" class="modal-btn modal-btn--save">СОХРАНИТЬ</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <script src="app.js"></script>
 </body>
 </html>

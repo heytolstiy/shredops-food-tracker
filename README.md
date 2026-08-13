@@ -136,6 +136,7 @@ Both the Express API and the Telegraf bot start from the same `index.js` entry p
 | `/profile` | Read-only summary of current profile: biometrics, targets, macros, water goal |
 | `/weight` | Record or view today's weigh-in. `/weight 82.5` upserts today's entry (re-recording the same day overwrites, never duplicates); `/weight` alone shows the last recorded value. Keeps `users.weight_kg` in sync |
 | `/steps` | Record or view today's step count. `/steps 8500` upserts today's entry (overwrites, never duplicates); `/steps` alone shows today's value |
+| `/targets` | Manually override daily calorie/macro targets. `/targets 2000 175 70 180` (calories, protein, fat, carbs) writes directly to the profile, bypassing the TDEE/macro-split calculator; `/targets` alone shows current values |
 | `/reset` | Clears current state and re-runs the full 8-step onboarding wizard |
 | `/dashboard` | Sends an inline button that opens the Mini App web dashboard |
 | `/help` | Usage guide for all three logging methods (photo, text, manual) |
@@ -157,6 +158,7 @@ Both the Express API and the Telegraf bot start from the same `index.js` entry p
 - **Water tracker** — gamified power cells (250 ml each), tap to log
 - **Weight card** — record/update today's weigh-in inline; past days show a read-only value (or "not recorded") when browsing the timeline
 - **Steps card** — same pattern as weight: editable today, read-only when browsing past days
+- **Targets editor** — "✏️ ЦЕЛИ" button on the macronutrient section opens a modal to manually override daily calories/protein/fat/carbs
 - **Historical timeline** — horizontal scrollable 90-day strip; tap any day to view that date read-only
 - **Food log** — per-entry cards with edit and delete actions (today only)
 - **Edit modal** — update calories, macros, and portion weight inline

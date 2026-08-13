@@ -264,6 +264,45 @@ app.post('/api/steps', async (req, res) => {
   res.json({ ok: true, steps });
 });
 
+// PUT — manually override daily calorie/macro targets (bypasses the
+// TDEE/macro-split calculator; this is direct user control, not a recalc).
+app.put('/api/targets', async (req, res) => {
+  const telegramId = parseInt(req.body.userId, 10);
+
+  const toRange = (v, lo, hi) => {
+    const n = Math.round(Number(v));
+    return isFinite(n) && n >= lo && n <= hi ? n : null;
+  };
+
+  const calories = toRange(req.body.calories,  500,  8000);
+  const protein  = toRange(req.body.protein_g, 0,    600);
+  const fat      = toRange(req.body.fat_g,     0,    600);
+  const carbs    = toRange(req.body.carbs_g,   0,    600);
+
+  if (isNaN(telegramId)) return res.status(400).json({ error: 'Invalid userId' });
+  if ([calories, protein, fat, carbs].some(v => v === null)) {
+    return res.status(400).json({ error: 'Invalid target values' });
+  }
+
+  const { error } = await supabase
+    .from('users')
+    .update({
+      daily_calories:  calories,
+      daily_protein_g: protein,
+      daily_fat_g:     fat,
+      daily_carbs_g:   carbs,
+      updated_at:      new Date().toISOString(),
+    })
+    .eq('telegram_id', telegramId);
+
+  if (error) {
+    console.error('[/api/targets] update error:', error.message);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+
+  res.json({ ok: true, calories, protein_g: protein, fat_g: fat, carbs_g: carbs });
+});
+
 // GET historical data for any MSK date (YYYY-MM-DD)
 app.get('/api/logs/:userId/:date', async (req, res) => {
   const userId = parseInt(req.params.userId, 10);
@@ -426,6 +465,7 @@ async function startBot(retries = 5) {
       { command: 'profile',   description: 'Настроить цели и параметры' },
       { command: 'weight',    description: 'Записать/посмотреть вес' },
       { command: 'steps',     description: 'Записать/посмотреть шаги' },
+      { command: 'targets',   description: 'Изменить цели по КБЖУ' },
       { command: 'help',      description: 'Справка по вводу' },
     ]).catch(err => console.error('[commands] setMyCommands error:', err.message));
 

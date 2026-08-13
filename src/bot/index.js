@@ -78,6 +78,7 @@ bot.command('start', async (ctx) => {
       `/today — прогресс за день\n` +
       `/weight — записать/посмотреть вес\n` +
       `/steps — записать/посмотреть шаги\n` +
+      `/targets — изменить цели по КБЖУ\n` +
       `/dashboard — открыть статистику\n` +
       `/profile — твои данные\n` +
       `/reset — заполнить анкету заново`
@@ -318,6 +319,88 @@ bot.command(['steps', 'шаги'], async (ctx) => {
   return ctx.reply(`✅ Шаги записаны: <b>${steps}</b> — ${today}`, { parse_mode: 'HTML' });
 });
 
+// ── /targets — manual daily calorie/macro correction ───────────────────────
+// Direct override of users.daily_calories/daily_protein_g/daily_fat_g/
+// daily_carbs_g — bypasses calculateTDEE/calculateMacros entirely. This is
+// the user taking manual control, not a recalculation. Unlike /reset (full
+// 8-step onboarding wizard), this touches only the four target numbers.
+
+function parseTargetsArgs(text) {
+  const parts = text.trim().split(/\s+/).slice(1);
+  return parts.length === 4 ? parts : null;
+}
+
+bot.command('targets', async (ctx) => {
+  const telegramId = ctx.from.id;
+  const args = parseTargetsArgs(ctx.message.text);
+
+  const { data: user, error: userError } = await supabase
+    .from('users')
+    .select('daily_calories, daily_protein_g, daily_fat_g, daily_carbs_g, onboarding_complete')
+    .eq('telegram_id', telegramId)
+    .maybeSingle();
+
+  if (userError) {
+    console.error('[/targets] user query error:', userError.message);
+    return ctx.reply('Что-то пошло не так. Попробуй ещё раз.');
+  }
+
+  if (!user?.onboarding_complete) {
+    return ctx.reply('Сначала заполни анкету — используй /start.');
+  }
+
+  // No arguments — show current targets
+  if (!args) {
+    return ctx.reply(
+      `📊 <b>Текущие цели:</b>\n\n` +
+      `🔥 Калории:  <b>${user.daily_calories}</b> ккал\n` +
+      `🥩 Белки:    <b>${user.daily_protein_g}</b> г\n` +
+      `🧈 Жиры:     <b>${user.daily_fat_g}</b> г\n` +
+      `🍞 Углеводы: <b>${user.daily_carbs_g}</b> г\n\n` +
+      `Изменить: <code>/targets 2000 175 70 180</code>\n` +
+      `(порядок: калории, белки, жиры, углеводы)`,
+      { parse_mode: 'HTML' }
+    );
+  }
+
+  const nums = args.map(s => Math.round(Number(s.replace(',', '.'))));
+  const [calories, protein, fat, carbs] = nums;
+
+  const inRange = (v, lo, hi) => Number.isFinite(v) && v >= lo && v <= hi;
+  if (!inRange(calories, 500, 8000) || !inRange(protein, 0, 600) || !inRange(fat, 0, 600) || !inRange(carbs, 0, 600)) {
+    return ctx.reply(
+      '⚠️ Проверь значения: калории 500–8000, белки/жиры/углеводы 0–600 г.\n\n' +
+      'Пример: <code>/targets 2000 175 70 180</code>',
+      { parse_mode: 'HTML' }
+    );
+  }
+
+  const { error: updateError } = await supabase
+    .from('users')
+    .update({
+      daily_calories:  calories,
+      daily_protein_g: protein,
+      daily_fat_g:     fat,
+      daily_carbs_g:   carbs,
+      updated_at:      new Date().toISOString(),
+    })
+    .eq('telegram_id', telegramId);
+
+  if (updateError) {
+    console.error('[/targets] update error:', updateError.message);
+    return ctx.reply('❌ Не удалось сохранить цели. Попробуй ещё раз.');
+  }
+
+  return ctx.reply(
+    `✅ <b>Цели обновлены:</b>\n\n` +
+    `🔥 Калории:  <b>${calories}</b> ккал\n` +
+    `🥩 Белки:    <b>${protein}</b> г\n` +
+    `🧈 Жиры:     <b>${fat}</b> г\n` +
+    `🍞 Углеводы: <b>${carbs}</b> г`,
+    { parse_mode: 'HTML' }
+  );
+});
+
 // ── /reset — re-runs the onboarding wizard from step 1 ───────────────────
 
 bot.command(['reset', 'сброс'], (ctx) => ctx.scene.enter('onboarding'));
@@ -341,12 +424,16 @@ bot.command('help', (ctx) => ctx.reply(
   `👟 <b>Шаги:</b>\n` +
   `<code>/steps 8500</code> — записать шаги за сегодня (повторный ввод перезаписывает)\n` +
   `<code>/steps</code> — посмотреть сегодняшнее значение\n\n` +
+  `🎯 <b>Цели по КБЖУ:</b>\n` +
+  `<code>/targets 2000 175 70 180</code> — задать калории/белки/жиры/углеводы вручную (порядок именно такой)\n` +
+  `<code>/targets</code> — посмотреть текущие цели\n\n` +
   `📌 <b>Команды:</b>\n` +
   `/dashboard — открыть дашборд КБЖУ\n` +
   `/profile — пересчитать цели\n` +
   `/today — прогресс за сегодня\n` +
   `/weight — вес\n` +
-  `/steps — шаги`,
+  `/steps — шаги\n` +
+  `/targets — изменить цели`,
   { parse_mode: 'HTML' }
 ));
 

@@ -47,6 +47,7 @@ let currentWeightKg    = null;
 let weightPending      = false;
 let currentSteps       = null;
 let stepsPending       = false;
+let currentUser        = null;
 let activeDate         = mskToday();
 let viewingPast        = false;
 
@@ -458,6 +459,7 @@ function render(data) {
   currentWaterTarget = user.target_water_ml || 2500;
   currentWeightKg    = weightKg ?? null;
   currentSteps       = steps ?? null;
+  currentUser        = user;
 
   const totals = logs.reduce(
     (a, e) => ({
@@ -471,8 +473,15 @@ function render(data) {
 
   $('hero-section').innerHTML = heroHTML(user, totals, date);
 
+  const targetsEditBtn = viewingPast
+    ? ''
+    : `<button class="section-edit-btn" id="targets-edit-btn" type="button">✏️ ЦЕЛИ</button>`;
+
   $('macro-section').innerHTML = `
-    <p class="section-label">Макронутриенты</p>
+    <div class="section-label-row">
+      <p class="section-label">Макронутриенты</p>
+      ${targetsEditBtn}
+    </div>
     <div class="macro-grid">
       ${macroCard('Белки',    totals.pro, user.daily_protein_g, 'pro',  'mc-pro')}
       ${macroCard('Жиры',     totals.fat, user.daily_fat_g,     'fat',  'mc-fat')}
@@ -629,6 +638,53 @@ $('edit-form').addEventListener('submit', async e => {
   }
 });
 
+/* ── Targets modal — manual daily calorie/macro correction ──────────────── */
+function openTargetsModal() {
+  if (!currentUser) return;
+  $('targets-cal').value = currentUser.daily_calories  || 0;
+  $('targets-pro').value = currentUser.daily_protein_g || 0;
+  $('targets-fat').value = currentUser.daily_fat_g     || 0;
+  $('targets-car').value = currentUser.daily_carbs_g   || 0;
+  $('targets-modal').classList.remove('hidden');
+}
+
+function closeTargetsModal() {
+  $('targets-modal').classList.add('hidden');
+}
+
+$('targets-modal-cancel').addEventListener('click', closeTargetsModal);
+
+$('targets-modal').addEventListener('click', e => {
+  if (e.target === $('targets-modal')) closeTargetsModal();
+});
+
+$('targets-form').addEventListener('submit', async e => {
+  e.preventDefault();
+
+  const body = {
+    userId,
+    calories:  Number($('targets-cal').value),
+    protein_g: Number($('targets-pro').value),
+    fat_g:     Number($('targets-fat').value),
+    carbs_g:   Number($('targets-car').value),
+  };
+
+  try {
+    const res = await apiFetch('/api/targets', {
+      method:  'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `HTTP ${res.status}`);
+    closeTargetsModal();
+    loadData();
+  } catch (err) {
+    console.error('[targets] PUT error:', err);
+    const msg = 'Не удалось сохранить цели. Проверь значения и попробуй ещё раз.';
+    tg.showAlert ? tg.showAlert(msg) : alert(msg);
+  }
+});
+
 /* ── Delete ────────────────────────────────────────────────────────────── */
 async function deleteLog(logId) {
   try {
@@ -651,6 +707,12 @@ document.addEventListener('click', e => {
 
   // All mutable actions are disabled when viewing a past day
   if (viewingPast) return;
+
+  // Targets edit
+  if (e.target.closest('#targets-edit-btn')) {
+    openTargetsModal();
+    return;
+  }
 
   // Food log edit
   const editBtn = e.target.closest('.lc-btn-edit');
