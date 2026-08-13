@@ -113,7 +113,7 @@ app.get('/api/today/:userId', async (req, res) => {
 
   const today = todayMSK();
 
-  const [userResult, logsResult, waterResult, weightResult] = await Promise.all([
+  const [userResult, logsResult, waterResult, weightResult, stepsResult] = await Promise.all([
     supabase
       .from('users')
       .select('daily_calories, daily_protein_g, daily_fat_g, daily_carbs_g, first_name, username, goal, target_water_ml, current_streak, max_streak')
@@ -136,6 +136,12 @@ app.get('/api/today/:userId', async (req, res) => {
       .eq('telegram_id', userId)
       .eq('log_date', today)
       .maybeSingle(),
+    supabase
+      .from('steps_logs')
+      .select('steps')
+      .eq('telegram_id', userId)
+      .eq('log_date', today)
+      .maybeSingle(),
   ]);
 
   if (!userResult.data) {
@@ -152,6 +158,7 @@ app.get('/api/today/:userId', async (req, res) => {
     date:        today,
     waterLogged,
     weightKg:    weightResult.data?.weight_kg ?? null,
+    steps:       stepsResult.data?.steps ?? null,
   });
 });
 
@@ -230,6 +237,33 @@ app.post('/api/weight', async (req, res) => {
   res.json({ ok: true, weightKg });
 });
 
+// POST — upsert today's step count (one value per day, overwrite on re-entry)
+app.post('/api/steps', async (req, res) => {
+  const telegramId = parseInt(req.body.userId, 10);
+  const steps       = Math.round(Number(req.body.steps));
+
+  if (isNaN(telegramId)) return res.status(400).json({ error: 'Invalid userId' });
+  if (isNaN(steps) || steps < 0 || steps > 200000) {
+    return res.status(400).json({ error: 'Invalid steps' });
+  }
+
+  const today = todayMSK();
+
+  const { error: upsertError } = await supabase
+    .from('steps_logs')
+    .upsert(
+      { telegram_id: telegramId, log_date: today, steps, logged_at: new Date().toISOString() },
+      { onConflict: 'telegram_id,log_date' }
+    );
+
+  if (upsertError) {
+    console.error('[/api/steps] upsert error:', upsertError.message);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+
+  res.json({ ok: true, steps });
+});
+
 // GET historical data for any MSK date (YYYY-MM-DD)
 app.get('/api/logs/:userId/:date', async (req, res) => {
   const userId = parseInt(req.params.userId, 10);
@@ -239,7 +273,7 @@ app.get('/api/logs/:userId/:date', async (req, res) => {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ error: 'Invalid date format' });
   if (date > todayMSK()) return res.status(400).json({ error: 'Future date not allowed' });
 
-  const [userResult, logsResult, waterResult, weightResult] = await Promise.all([
+  const [userResult, logsResult, waterResult, weightResult, stepsResult] = await Promise.all([
     supabase
       .from('users')
       .select('daily_calories, daily_protein_g, daily_fat_g, daily_carbs_g, first_name, username, goal, target_water_ml, current_streak, max_streak')
@@ -262,6 +296,12 @@ app.get('/api/logs/:userId/:date', async (req, res) => {
       .eq('telegram_id', userId)
       .eq('log_date', date)
       .maybeSingle(),
+    supabase
+      .from('steps_logs')
+      .select('steps')
+      .eq('telegram_id', userId)
+      .eq('log_date', date)
+      .maybeSingle(),
   ]);
 
   if (!userResult.data) return res.status(404).json({ error: 'User not found' });
@@ -276,6 +316,7 @@ app.get('/api/logs/:userId/:date', async (req, res) => {
     date,
     waterLogged,
     weightKg:    weightResult.data?.weight_kg ?? null,
+    steps:       stepsResult.data?.steps ?? null,
   });
 });
 
@@ -384,6 +425,7 @@ async function startBot(retries = 5) {
       { command: 'dashboard', description: 'Открыть матрицу КБЖУ' },
       { command: 'profile',   description: 'Настроить цели и параметры' },
       { command: 'weight',    description: 'Записать/посмотреть вес' },
+      { command: 'steps',     description: 'Записать/посмотреть шаги' },
       { command: 'help',      description: 'Справка по вводу' },
     ]).catch(err => console.error('[commands] setMyCommands error:', err.message));
 

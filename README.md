@@ -26,6 +26,7 @@ simple-food-water-tracker/
 ├── database.sql                # Full schema for a fresh Supabase project
 ├── migration_water.sql         # ALTER TABLE migration (adds target_water_ml + water_logs)
 ├── migration_weight_log.sql    # ALTER TABLE migration (adds weight_logs)
+├── migration_steps_log.sql     # ALTER TABLE migration (adds steps_logs)
 ├── package.json
 ├── .env                        # Secret keys — never commit this
 └── src/
@@ -89,7 +90,7 @@ Create a `.env` file in the project root and fill in your keys (see the table ab
 In your Supabase dashboard → **SQL Editor** → **New query**:
 
 - **Fresh project:** paste and run `database.sql`
-- **Existing project (if you previously ran the base schema):** paste and run `migration_water.sql`, then `migration_weight_log.sql`
+- **Existing project (if you previously ran the base schema):** paste and run `migration_water.sql`, then `migration_weight_log.sql`, then `migration_steps_log.sql`
 
 ### 4. Start a public HTTPS tunnel (local dev only)
 
@@ -134,6 +135,7 @@ Both the Express API and the Telegraf bot start from the same `index.js` entry p
 | `/start` | Welcome message if onboarded; launches profile wizard for new users |
 | `/profile` | Read-only summary of current profile: biometrics, targets, macros, water goal |
 | `/weight` | Record or view today's weigh-in. `/weight 82.5` upserts today's entry (re-recording the same day overwrites, never duplicates); `/weight` alone shows the last recorded value. Keeps `users.weight_kg` in sync |
+| `/steps` | Record or view today's step count. `/steps 8500` upserts today's entry (overwrites, never duplicates); `/steps` alone shows today's value |
 | `/reset` | Clears current state and re-runs the full 8-step onboarding wizard |
 | `/dashboard` | Sends an inline button that opens the Mini App web dashboard |
 | `/help` | Usage guide for all three logging methods (photo, text, manual) |
@@ -154,6 +156,7 @@ Both the Express API and the Telegraf bot start from the same `index.js` entry p
 - **Macro grid** — protein / fat / carbs with individual progress bars
 - **Water tracker** — gamified power cells (250 ml each), tap to log
 - **Weight card** — record/update today's weigh-in inline; past days show a read-only value (or "not recorded") when browsing the timeline
+- **Steps card** — same pattern as weight: editable today, read-only when browsing past days
 - **Historical timeline** — horizontal scrollable 90-day strip; tap any day to view that date read-only
 - **Food log** — per-entry cards with edit and delete actions (today only)
 - **Edit modal** — update calories, macros, and portion weight inline

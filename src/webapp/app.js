@@ -45,6 +45,8 @@ let currentWaterTarget = 2500;
 let waterPending       = false;
 let currentWeightKg    = null;
 let weightPending      = false;
+let currentSteps       = null;
+let stepsPending       = false;
 let activeDate         = mskToday();
 let viewingPast        = false;
 
@@ -343,6 +345,77 @@ function attachWeightHandlers() {
   $('weight-save-btn')?.addEventListener('click', saveWeight);
 }
 
+/* ── Render: steps section ─────────────────────────────────────────────── */
+function stepsHTML(steps, isPast) {
+  if (isPast) {
+    return `
+      <p class="section-label">Шаги</p>
+      <div class="card steps-card">
+        ${steps != null
+          ? `<div class="steps-display"><span class="steps-num">${steps}</span></div>`
+          : `<p class="steps-hint">Шаги в этот день не записаны.</p>`}
+      </div>`;
+  }
+
+  return `
+    <p class="section-label">Шаги</p>
+    <div class="card steps-card">
+      <div class="steps-row">
+        <input class="steps-input" id="steps-input" type="number" inputmode="numeric"
+               step="1" min="0" max="200000"
+               value="${steps != null ? steps : ''}" placeholder="—">
+        <button class="steps-save-btn" id="steps-save-btn" type="button">Сохранить</button>
+      </div>
+      <p class="steps-hint">Повторное сохранение за сегодня перезапишет значение.</p>
+    </div>`;
+}
+
+/* ── Steps: save today's entry (upsert, overwrite-safe) ──────────────────── */
+async function saveSteps() {
+  if (stepsPending || viewingPast) return;
+
+  const input = $('steps-input');
+  const val   = Math.round(Number(input?.value));
+
+  if (isNaN(val) || val < 0 || val > 200000) {
+    const msg = 'Введи шаги числом от 0 до 200000.';
+    tg.showAlert ? tg.showAlert(msg) : alert(msg);
+    return;
+  }
+
+  stepsPending = true;
+  const btn = $('steps-save-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '...'; }
+
+  try {
+    const res = await apiFetch('/api/steps', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ userId, steps: val }),
+    });
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `HTTP ${res.status}`);
+
+    const { steps } = await res.json();
+    currentSteps = steps;
+    tg.HapticFeedback?.notificationOccurred?.('success');
+    $('steps-section').innerHTML = stepsHTML(steps, false);
+    attachStepsHandlers();
+  } catch (err) {
+    console.error('[steps] POST error:', err);
+    const msg = 'Не удалось сохранить шаги. Попробуй ещё раз.';
+    tg.showAlert ? tg.showAlert(msg) : alert(msg);
+  } finally {
+    stepsPending = false;
+    const btnAgain = $('steps-save-btn');
+    if (btnAgain) { btnAgain.disabled = false; btnAgain.textContent = 'Сохранить'; }
+  }
+}
+
+// Re-bind after every innerHTML replace — the button element is recreated each render
+function attachStepsHandlers() {
+  $('steps-save-btn')?.addEventListener('click', saveSteps);
+}
+
 /* ── Render: log card ──────────────────────────────────────────────────── */
 function logCard(entry) {
   const name   = entry.raw_ai_response?.identified_food || entry.description;
@@ -379,11 +452,12 @@ function logCard(entry) {
 
 /* ── Main render ───────────────────────────────────────────────────────── */
 function render(data) {
-  const { user, logs, date, waterLogged, weightKg } = data;
+  const { user, logs, date, waterLogged, weightKg, steps } = data;
   currentLogs        = logs;
   currentWaterLogged = waterLogged || 0;
   currentWaterTarget = user.target_water_ml || 2500;
   currentWeightKg    = weightKg ?? null;
+  currentSteps       = steps ?? null;
 
   const totals = logs.reduce(
     (a, e) => ({
@@ -409,6 +483,9 @@ function render(data) {
 
   $('weight-section').innerHTML = weightHTML(currentWeightKg, viewingPast);
   attachWeightHandlers();
+
+  $('steps-section').innerHTML = stepsHTML(currentSteps, viewingPast);
+  attachStepsHandlers();
 
   const emptyMsg = viewingPast
     ? 'В этот день ничего не записано.'
@@ -450,6 +527,7 @@ function showError(msg) {
   $('macro-section').innerHTML  = '';
   $('water-section').innerHTML  = '';
   $('weight-section').innerHTML = '';
+  $('steps-section').innerHTML  = '';
   $('log-section').innerHTML    = '';
 }
 

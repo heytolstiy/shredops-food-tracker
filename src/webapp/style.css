@@ -841,6 +841,67 @@ body {
   color: var(--violet);
 }
 
+/* ── Steps section ────────────────────────────────────────────────────────── */
+.steps-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.steps-input {
+  flex: 1;
+  min-width: 0;
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  font-size: 20px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--t1);
+}
+.steps-input:focus { outline: none; border-color: var(--pink); }
+.steps-input::-webkit-outer-spin-button,
+.steps-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.steps-input[type=number] { -moz-appearance: textfield; }
+
+.steps-save-btn {
+  flex-shrink: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 10px 16px;
+  background: var(--pink);
+  color: #fff;
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.steps-save-btn:active   { transform: scale(0.96); }
+.steps-save-btn:disabled { opacity: 0.6; cursor: default; }
+
+.steps-hint {
+  margin-top: 8px;
+  text-align: center;
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  color: var(--t3);
+}
+
+.steps-display {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+}
+.steps-num {
+  font-size: 32px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--pink);
+}
+
 /* ── Historical timeline ─────────────────────────────────────────────────── */
 .timeline {
   display: flex;
