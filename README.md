@@ -133,7 +133,7 @@ Both the Express API and the Telegraf bot start from the same `index.js` entry p
 |---|---|
 | `/start` | Welcome message if onboarded; launches profile wizard for new users |
 | `/profile` | Read-only summary of current profile: biometrics, targets, macros, water goal |
-| `/вес` (`/weight`) | Record or view today's weigh-in. `/вес 82.5` upserts today's entry (re-recording the same day overwrites, never duplicates); `/вес` alone shows the last recorded value. Keeps `users.weight_kg` in sync |
+| `/weight` | Record or view today's weigh-in. `/weight 82.5` upserts today's entry (re-recording the same day overwrites, never duplicates); `/weight` alone shows the last recorded value. Keeps `users.weight_kg` in sync |
 | `/reset` | Clears current state and re-runs the full 8-step onboarding wizard |
 | `/dashboard` | Sends an inline button that opens the Mini App web dashboard |
 | `/help` | Usage guide for all three logging methods (photo, text, manual) |

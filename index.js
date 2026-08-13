@@ -376,10 +376,14 @@ async function startBot(retries = 5) {
     botRunning = true;
     console.log('[system] Bot polling started.');
 
+    // Command names here must be lowercase ASCII per the Bot API's BotCommand
+    // spec — Cyrillic aliases (e.g. "вес") can't be registered and, even when
+    // typed by the user, aren't reliably recognised as bot_command entities.
     bot.telegram.setMyCommands([
       { command: 'start',     description: 'Перезапуск бота' },
       { command: 'dashboard', description: 'Открыть матрицу КБЖУ' },
       { command: 'profile',   description: 'Настроить цели и параметры' },
+      { command: 'weight',    description: 'Записать/посмотреть вес' },
       { command: 'help',      description: 'Справка по вводу' },
     ]).catch(err => console.error('[commands] setMyCommands error:', err.message));
 
