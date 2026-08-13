@@ -76,6 +76,7 @@ bot.command('start', async (ctx) => {
       `Отправь 📷 фото еды с подписью (вес и состав), чтобы занести приём пищи.\n\n` +
       `Команды:\n` +
       `/today — прогресс за день\n` +
+      `/вес — записать/посмотреть вес\n` +
       `/dashboard — открыть статистику\n` +
       `/profile — твои данные\n` +
       `/reset — заполнить анкету заново`
@@ -136,6 +137,98 @@ bot.command(['profile', 'профиль'], async (ctx) => {
   );
 });
 
+// ── /вес — editable daily weigh-in ─────────────────────────────────────────
+// One value per day: re-recording the same day overwrites via upsert on
+// (telegram_id, log_date), it never duplicates. Keeps users.weight_kg in
+// sync so /profile always reflects the latest weigh-in, not the onboarding
+// value.
+
+function parseWeightArg(text) {
+  const parts = text.trim().split(/\s+/);
+  return parts.length > 1 ? parts.slice(1).join(' ') : null;
+}
+
+bot.command(['weight', 'вес'], async (ctx) => {
+  const telegramId = ctx.from.id;
+  const arg = parseWeightArg(ctx.message.text);
+
+  const { data: user, error: userError } = await supabase
+    .from('users')
+    .select('weight_kg, onboarding_complete')
+    .eq('telegram_id', telegramId)
+    .maybeSingle();
+
+  if (userError) {
+    console.error('[/вес] user query error:', userError.message);
+    return ctx.reply('Что-то пошло не так. Попробуй ещё раз.');
+  }
+
+  if (!user?.onboarding_complete) {
+    return ctx.reply('Сначала заполни анкету — используй /start.');
+  }
+
+  // No argument — show the last recorded weight
+  if (!arg) {
+    const { data: last, error } = await supabase
+      .from('weight_logs')
+      .select('weight_kg, log_date')
+      .eq('telegram_id', telegramId)
+      .order('log_date', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      console.error('[/вес] last-entry query error:', error.message);
+      return ctx.reply('Не удалось загрузить данные. Попробуй ещё раз.');
+    }
+
+    if (!last) {
+      return ctx.reply(
+        `⚖️ Записей веса пока нет. Из анкеты: <b>${user.weight_kg}</b> кг.\n\n` +
+        `Чтобы записать текущий вес: <code>/вес 82.5</code>`,
+        { parse_mode: 'HTML' }
+      );
+    }
+
+    return ctx.reply(
+      `⚖️ Последняя запись: <b>${last.weight_kg}</b> кг — ${last.log_date}\n\n` +
+      `Обновить: <code>/вес 82.5</code>`,
+      { parse_mode: 'HTML' }
+    );
+  }
+
+  // Argument given — validate and upsert today's entry
+  const weightKg = parseFloat(arg.replace(',', '.'));
+  if (isNaN(weightKg) || weightKg < 20 || weightKg > 300) {
+    return ctx.reply('⚠️ Введи вес числом от 20 до 300 кг. Пример: <code>/вес 82.5</code>', { parse_mode: 'HTML' });
+  }
+
+  const today = todayMSK();
+
+  const { error: upsertError } = await supabase
+    .from('weight_logs')
+    .upsert(
+      { telegram_id: telegramId, log_date: today, weight_kg: weightKg, logged_at: new Date().toISOString() },
+      { onConflict: 'telegram_id,log_date' }
+    );
+
+  if (upsertError) {
+    console.error('[/вес] upsert error:', upsertError.message);
+    return ctx.reply('❌ Не удалось сохранить вес. Попробуй ещё раз.');
+  }
+
+  const { error: usersUpdateError } = await supabase
+    .from('users')
+    .update({ weight_kg: weightKg, updated_at: new Date().toISOString() })
+    .eq('telegram_id', telegramId);
+
+  if (usersUpdateError) {
+    console.error('[/вес] users update error:', usersUpdateError.message);
+  }
+
+  return ctx.reply(`✅ Вес записан: <b>${weightKg}</b> кг — ${today}`, { parse_mode: 'HTML' });
+});
+
 // ── /reset — re-runs the onboarding wizard from step 1 ───────────────────
 
 bot.command(['reset', 'сброс'], (ctx) => ctx.scene.enter('onboarding'));
@@ -153,10 +246,14 @@ bot.command('help', (ctx) => ctx.reply(
   `✍️ <b>Ручной ввод:</b>\n` +
   `<code>Ручной ввод: Название, Ккал, Белки, Жиры, Углеводы</code>\n` +
   `Пример: <code>Ручной ввод: Курица, 165, 31, 3, 0</code>\n\n` +
+  `⚖️ <b>Вес:</b>\n` +
+  `<code>/вес 82.5</code> — записать вес на сегодня (повторный ввод в тот же день перезаписывает)\n` +
+  `<code>/вес</code> — посмотреть последнюю запись\n\n` +
   `📌 <b>Команды:</b>\n` +
   `/dashboard — открыть дашборд КБЖУ\n` +
   `/profile — пересчитать цели\n` +
-  `/today — прогресс за сегодня`,
+  `/today — прогресс за сегодня\n` +
+  `/вес — вес`,
   { parse_mode: 'HTML' }
 ));
 

@@ -75,6 +75,23 @@ CREATE INDEX IF NOT EXISTS idx_water_logs_telegram_date
   ON water_logs(telegram_id, log_date);
 
 
+-- ── WEIGHT LOGS ───────────────────────────────────────────────────────────────
+-- One row per day (not per entry). Re-recording the same day overwrites the
+-- value via UNIQUE(telegram_id, log_date) + upsert — the app never duplicates
+-- a day's weigh-in.
+CREATE TABLE IF NOT EXISTS weight_logs (
+  id           BIGSERIAL PRIMARY KEY,
+  telegram_id  BIGINT      NOT NULL REFERENCES users(telegram_id) ON DELETE CASCADE,
+  log_date     DATE        NOT NULL DEFAULT CURRENT_DATE,
+  weight_kg    NUMERIC(5,2) NOT NULL CHECK (weight_kg BETWEEN 20 AND 300),
+  logged_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (telegram_id, log_date)
+);
+
+CREATE INDEX IF NOT EXISTS idx_weight_logs_telegram_date
+  ON weight_logs(telegram_id, log_date);
+
+
 -- ── BOT SESSIONS ─────────────────────────────────────────────────────────────
 -- Persists Telegraf session state (pendingLog, onboarding step) across bot
 -- restarts. Without this, Railway redeploys wipe in-memory sessions and users
@@ -92,4 +109,5 @@ CREATE TABLE IF NOT EXISTS bot_sessions (
 ALTER TABLE users        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE food_logs    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE water_logs   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE weight_logs  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE bot_sessions ENABLE ROW LEVEL SECURITY;

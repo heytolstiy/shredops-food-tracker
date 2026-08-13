@@ -43,6 +43,8 @@ let editingLogId       = null;
 let currentWaterLogged = 0;
 let currentWaterTarget = 2500;
 let waterPending       = false;
+let currentWeightKg    = null;
+let weightPending      = false;
 let activeDate         = mskToday();
 let viewingPast        = false;
 
@@ -269,6 +271,78 @@ function waterHTML(target, logged) {
     </div>`;
 }
 
+/* ── Render: weight section ────────────────────────────────────────────── */
+function weightHTML(weightKg, isPast) {
+  if (isPast) {
+    return `
+      <p class="section-label">Вес</p>
+      <div class="card weight-card">
+        ${weightKg != null
+          ? `<div class="weight-display"><span class="weight-num">${weightKg}</span><span class="weight-unit">кг</span></div>`
+          : `<p class="weight-hint">Вес в этот день не записан.</p>`}
+      </div>`;
+  }
+
+  return `
+    <p class="section-label">Вес</p>
+    <div class="card weight-card">
+      <div class="weight-row">
+        <input class="weight-input" id="weight-input" type="number" inputmode="decimal"
+               step="0.1" min="20" max="300"
+               value="${weightKg != null ? weightKg : ''}" placeholder="—">
+        <span class="weight-unit">кг</span>
+        <button class="weight-save-btn" id="weight-save-btn" type="button">Сохранить</button>
+      </div>
+      <p class="weight-hint">Повторное сохранение за сегодня перезапишет значение.</p>
+    </div>`;
+}
+
+/* ── Weight: save today's entry (upsert, overwrite-safe) ────────────────── */
+async function saveWeight() {
+  if (weightPending || viewingPast) return;
+
+  const input = $('weight-input');
+  const val   = parseFloat(input?.value);
+
+  if (isNaN(val) || val < 20 || val > 300) {
+    const msg = 'Введи вес числом от 20 до 300 кг.';
+    tg.showAlert ? tg.showAlert(msg) : alert(msg);
+    return;
+  }
+
+  weightPending = true;
+  const btn = $('weight-save-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '...'; }
+
+  try {
+    const res = await apiFetch('/api/weight', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ userId, weight_kg: val }),
+    });
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `HTTP ${res.status}`);
+
+    const { weightKg } = await res.json();
+    currentWeightKg = weightKg;
+    tg.HapticFeedback?.notificationOccurred?.('success');
+    $('weight-section').innerHTML = weightHTML(weightKg, false);
+    attachWeightHandlers();
+  } catch (err) {
+    console.error('[weight] POST error:', err);
+    const msg = 'Не удалось сохранить вес. Попробуй ещё раз.';
+    tg.showAlert ? tg.showAlert(msg) : alert(msg);
+  } finally {
+    weightPending = false;
+    const btnAgain = $('weight-save-btn');
+    if (btnAgain) { btnAgain.disabled = false; btnAgain.textContent = 'Сохранить'; }
+  }
+}
+
+// Re-bind after every innerHTML replace — the button element is recreated each render
+function attachWeightHandlers() {
+  $('weight-save-btn')?.addEventListener('click', saveWeight);
+}
+
 /* ── Render: log card ──────────────────────────────────────────────────── */
 function logCard(entry) {
   const name   = entry.raw_ai_response?.identified_food || entry.description;
@@ -305,10 +379,11 @@ function logCard(entry) {
 
 /* ── Main render ───────────────────────────────────────────────────────── */
 function render(data) {
-  const { user, logs, date, waterLogged } = data;
+  const { user, logs, date, waterLogged, weightKg } = data;
   currentLogs        = logs;
   currentWaterLogged = waterLogged || 0;
   currentWaterTarget = user.target_water_ml || 2500;
+  currentWeightKg    = weightKg ?? null;
 
   const totals = logs.reduce(
     (a, e) => ({
@@ -331,6 +406,9 @@ function render(data) {
     </div>`;
 
   $('water-section').innerHTML = waterHTML(currentWaterTarget, currentWaterLogged);
+
+  $('weight-section').innerHTML = weightHTML(currentWeightKg, viewingPast);
+  attachWeightHandlers();
 
   const emptyMsg = viewingPast
     ? 'В этот день ничего не записано.'
@@ -369,9 +447,10 @@ function showError(msg) {
       <div class="error-icon">⚠️</div>
       ${msg}
     </div>`;
-  $('macro-section').innerHTML = '';
-  $('water-section').innerHTML = '';
-  $('log-section').innerHTML   = '';
+  $('macro-section').innerHTML  = '';
+  $('water-section').innerHTML  = '';
+  $('weight-section').innerHTML = '';
+  $('log-section').innerHTML    = '';
 }
 
 /* ── Water: counter-only DOM update (no full re-render) ─────────────────  */

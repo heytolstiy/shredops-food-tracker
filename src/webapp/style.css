@@ -771,6 +771,76 @@ body {
   transition: opacity 0.15s ease;
 }
 
+/* ── Weight section ───────────────────────────────────────────────────────── */
+.weight-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.weight-input {
+  flex: 1;
+  min-width: 0;
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  font-size: 20px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--t1);
+}
+.weight-input:focus { outline: none; border-color: var(--violet); }
+/* Remove native spinner arrows — free-form entry only */
+.weight-input::-webkit-outer-spin-button,
+.weight-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.weight-input[type=number] { -moz-appearance: textfield; }
+
+.weight-unit {
+  font-size: 13px;
+  color: var(--t2);
+  flex-shrink: 0;
+}
+
+.weight-save-btn {
+  flex-shrink: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 10px 16px;
+  background: var(--violet);
+  color: #fff;
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.weight-save-btn:active   { transform: scale(0.96); }
+.weight-save-btn:disabled { opacity: 0.6; cursor: default; }
+
+.weight-hint {
+  margin-top: 8px;
+  text-align: center;
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  color: var(--t3);
+}
+
+/* Read-only past-day display */
+.weight-display {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 6px;
+}
+.weight-num {
+  font-size: 32px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--violet);
+}
+
 /* ── Historical timeline ─────────────────────────────────────────────────── */
 .timeline {
   display: flex;

@@ -113,7 +113,7 @@ app.get('/api/today/:userId', async (req, res) => {
 
   const today = todayMSK();
 
-  const [userResult, logsResult, waterResult] = await Promise.all([
+  const [userResult, logsResult, waterResult, weightResult] = await Promise.all([
     supabase
       .from('users')
       .select('daily_calories, daily_protein_g, daily_fat_g, daily_carbs_g, first_name, username, goal, target_water_ml, current_streak, max_streak')
@@ -130,6 +130,12 @@ app.get('/api/today/:userId', async (req, res) => {
       .select('amount_ml')
       .eq('telegram_id', userId)
       .eq('log_date', today),
+    supabase
+      .from('weight_logs')
+      .select('weight_kg')
+      .eq('telegram_id', userId)
+      .eq('log_date', today)
+      .maybeSingle(),
   ]);
 
   if (!userResult.data) {
@@ -145,6 +151,7 @@ app.get('/api/today/:userId', async (req, res) => {
     logs:        logsResult.data ?? [],
     date:        today,
     waterLogged,
+    weightKg:    weightResult.data?.weight_kg ?? null,
   });
 });
 
@@ -186,6 +193,43 @@ app.post('/api/water', async (req, res) => {
   res.json({ ok: true, waterLogged: existing + amount });
 });
 
+// POST — upsert today's weigh-in (one value per day, overwrite on re-entry);
+// keeps users.weight_kg in sync so /profile reflects the latest weigh-in.
+app.post('/api/weight', async (req, res) => {
+  const telegramId = parseInt(req.body.userId, 10);
+  const weightKg    = parseFloat(req.body.weight_kg);
+
+  if (isNaN(telegramId)) return res.status(400).json({ error: 'Invalid userId' });
+  if (isNaN(weightKg) || weightKg < 20 || weightKg > 300) {
+    return res.status(400).json({ error: 'Invalid weight_kg' });
+  }
+
+  const today = todayMSK();
+
+  const { error: upsertError } = await supabase
+    .from('weight_logs')
+    .upsert(
+      { telegram_id: telegramId, log_date: today, weight_kg: weightKg, logged_at: new Date().toISOString() },
+      { onConflict: 'telegram_id,log_date' }
+    );
+
+  if (upsertError) {
+    console.error('[/api/weight] upsert error:', upsertError.message);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+
+  const { error: usersUpdateError } = await supabase
+    .from('users')
+    .update({ weight_kg: weightKg, updated_at: new Date().toISOString() })
+    .eq('telegram_id', telegramId);
+
+  if (usersUpdateError) {
+    console.error('[/api/weight] users update error:', usersUpdateError.message);
+  }
+
+  res.json({ ok: true, weightKg });
+});
+
 // GET historical data for any MSK date (YYYY-MM-DD)
 app.get('/api/logs/:userId/:date', async (req, res) => {
   const userId = parseInt(req.params.userId, 10);
@@ -195,7 +239,7 @@ app.get('/api/logs/:userId/:date', async (req, res) => {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ error: 'Invalid date format' });
   if (date > todayMSK()) return res.status(400).json({ error: 'Future date not allowed' });
 
-  const [userResult, logsResult, waterResult] = await Promise.all([
+  const [userResult, logsResult, waterResult, weightResult] = await Promise.all([
     supabase
       .from('users')
       .select('daily_calories, daily_protein_g, daily_fat_g, daily_carbs_g, first_name, username, goal, target_water_ml, current_streak, max_streak')
@@ -212,6 +256,12 @@ app.get('/api/logs/:userId/:date', async (req, res) => {
       .select('amount_ml')
       .eq('telegram_id', userId)
       .eq('log_date', date),
+    supabase
+      .from('weight_logs')
+      .select('weight_kg')
+      .eq('telegram_id', userId)
+      .eq('log_date', date)
+      .maybeSingle(),
   ]);
 
   if (!userResult.data) return res.status(404).json({ error: 'User not found' });
@@ -225,6 +275,7 @@ app.get('/api/logs/:userId/:date', async (req, res) => {
     logs:        logsResult.data ?? [],
     date,
     waterLogged,
+    weightKg:    weightResult.data?.weight_kg ?? null,
   });
 });
 
