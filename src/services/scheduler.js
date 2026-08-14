@@ -130,6 +130,29 @@ async function streakReminder(bot) {
 
 // ── JOB 4 — Evening Summary — 23:00 MSK ────────────────────────────────────
 // One query for all today's logs → aggregate in JS → one message per user.
+// Also the last scheduled touchpoint before the day rolls over, so this is
+// where today's target gets frozen into daily_targets for every active user
+// — regardless of whether they logged anything — so historical reads never
+// silently rewrite themselves if the user changes targets later.
+
+async function snapshotDailyTargets(users, today) {
+  if (!users.length) return;
+
+  const rows = users.map(u => ({
+    telegram_id: u.telegram_id,
+    log_date:    today,
+    calories:    u.daily_calories,
+    protein_g:   u.daily_protein_g,
+    fat_g:       u.daily_fat_g,
+    carbs_g:     u.daily_carbs_g,
+  }));
+
+  const { error } = await supabase
+    .from('daily_targets')
+    .upsert(rows, { onConflict: 'telegram_id,log_date' });
+
+  if (error) console.error('[scheduler/evening] daily_targets snapshot error:', error.message);
+}
 
 async function eveningSummary(bot) {
   const today = todayMSK();
@@ -146,6 +169,9 @@ async function eveningSummary(bot) {
     console.error('[scheduler/evening] DB error:', logsResult.error.message);
     return;
   }
+
+  // Non-critical: a snapshot failure must never block the evening messages
+  await snapshotDailyTargets(users, today);
 
   const totals = {};
   for (const row of logsResult.data ?? []) {

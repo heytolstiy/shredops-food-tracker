@@ -21,6 +21,7 @@ const { bot }           = require('./src/bot');
 const { supabase }      = require('./src/db/supabase');
 const { initScheduler } = require('./src/services/scheduler');
 const { todayMSK }      = require('./src/utils/time');
+const { generateWeeklyReport } = require('./src/services/export');
 
 // ── Express API ────────────────────────────────────────────────────────────
 
@@ -303,6 +304,25 @@ app.put('/api/targets', async (req, res) => {
   res.json({ ok: true, calories, protein_g: protein, fat_g: fat, carbs_g: carbs });
 });
 
+// GET — detailed 7-day export as a downloadable .md file. Shared generator
+// with the bot's /week command — one report, not two.
+app.get('/api/export/week/:userId', async (req, res) => {
+  const userId = parseInt(req.params.userId, 10);
+  if (isNaN(userId)) return res.status(400).json({ error: 'Invalid userId' });
+
+  try {
+    const report = await generateWeeklyReport(userId);
+    if (!report) return res.status(404).json({ error: 'User not found' });
+
+    res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${report.filename}"`);
+    res.send(report.content);
+  } catch (err) {
+    console.error('[/api/export/week] error:', err.message);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // GET historical data for any MSK date (YYYY-MM-DD)
 app.get('/api/logs/:userId/:date', async (req, res) => {
   const userId = parseInt(req.params.userId, 10);
@@ -312,7 +332,7 @@ app.get('/api/logs/:userId/:date', async (req, res) => {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ error: 'Invalid date format' });
   if (date > todayMSK()) return res.status(400).json({ error: 'Future date not allowed' });
 
-  const [userResult, logsResult, waterResult, weightResult, stepsResult] = await Promise.all([
+  const [userResult, logsResult, waterResult, weightResult, stepsResult, targetsResult] = await Promise.all([
     supabase
       .from('users')
       .select('daily_calories, daily_protein_g, daily_fat_g, daily_carbs_g, first_name, username, goal, target_water_ml, current_streak, max_streak')
@@ -341,6 +361,12 @@ app.get('/api/logs/:userId/:date', async (req, res) => {
       .eq('telegram_id', userId)
       .eq('log_date', date)
       .maybeSingle(),
+    supabase
+      .from('daily_targets')
+      .select('calories, protein_g, fat_g, carbs_g')
+      .eq('telegram_id', userId)
+      .eq('log_date', date)
+      .maybeSingle(),
   ]);
 
   if (!userResult.data) return res.status(404).json({ error: 'User not found' });
@@ -349,8 +375,24 @@ app.get('/api/logs/:userId/:date', async (req, res) => {
     ? 0
     : (waterResult.data ?? []).reduce((s, r) => s + (r.amount_ml || 0), 0);
 
+  // Historical days read the target that was frozen at day's end (23:00 MSK
+  // eveningSummary job), not the live profile — otherwise a later /targets
+  // change would silently rewrite how every past day is displayed. Falls
+  // back to the live profile if no snapshot exists yet (e.g. a day before
+  // this table existed).
+  const targetSnapshot = targetsResult.data;
+  const user = targetSnapshot
+    ? {
+        ...userResult.data,
+        daily_calories:  targetSnapshot.calories,
+        daily_protein_g: targetSnapshot.protein_g,
+        daily_fat_g:     targetSnapshot.fat_g,
+        daily_carbs_g:   targetSnapshot.carbs_g,
+      }
+    : userResult.data;
+
   res.json({
-    user:        userResult.data,
+    user,
     logs:        logsResult.data ?? [],
     date,
     waterLogged,
@@ -466,6 +508,7 @@ async function startBot(retries = 5) {
       { command: 'weight',    description: 'Записать/посмотреть вес' },
       { command: 'steps',     description: 'Записать/посмотреть шаги' },
       { command: 'targets',   description: 'Изменить цели по КБЖУ' },
+      { command: 'week',      description: 'Отчёт за 7 дней (.md)' },
       { command: 'help',      description: 'Справка по вводу' },
     ]).catch(err => console.error('[commands] setMyCommands error:', err.message));
 

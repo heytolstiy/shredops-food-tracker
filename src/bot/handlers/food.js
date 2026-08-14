@@ -1,7 +1,7 @@
 const { Markup }     = require('telegraf');
 const { supabase }   = require('../../db/supabase');
 const { analyzeFood, analyzeFoodCorrection } = require('../../services/vision');
-const { todayMSK, yesterdayMSK } = require('../../utils/time');
+const { todayMSK, yesterdayMSK, nowMSK } = require('../../utils/time');
 
 const NON_FOOD_REPLY =
   '⚠️ Объект не распознан как еда.\n\n' +
@@ -34,11 +34,23 @@ function previewKeyboard() {
   ]);
 }
 
+// ── meal_type by time of day (MSK) ──────────────────────────────────────────
+// No AI, no user prompt — just correct categorisation of an already-logged
+// entry so exports/history can break totals down by meal.
+
+function mealTypeForHour(hour) {
+  if (hour >= 5  && hour < 11) return 'breakfast';
+  if (hour >= 11 && hour < 16) return 'lunch';
+  if (hour >= 16 && hour < 21) return 'dinner';
+  return 'snack';
+}
+
 // ── DB helpers ──────────────────────────────────────────────────────────────
 
 async function insertLog(ctx, nutrition, description, photoFileId) {
   const telegramId = ctx.from.id;
   const today      = todayMSK();
+  const mealType   = mealTypeForHour(nowMSK().getUTCHours());
 
   const { error } = await supabase.from('food_logs').insert({
     telegram_id:     telegramId,
@@ -49,6 +61,7 @@ async function insertLog(ctx, nutrition, description, photoFileId) {
     protein_g:       nutrition.protein,
     fat_g:           nutrition.fat,
     carbs_g:         nutrition.carbs,
+    meal_type:       mealType,
     raw_ai_response: {
       identified_food:  nutrition.identified_food,
       assumed_weight_g: nutrition.assumed_weight_g,

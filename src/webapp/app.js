@@ -685,6 +685,44 @@ $('targets-form').addEventListener('submit', async e => {
   }
 });
 
+/* ── Weekly export — always last 7 days from today, independent of the ──
+   timeline's selected date, so no viewingPast gating here. ─────────────── */
+function weekReportFilename() {
+  const today = mskToday();
+  const start = new Date(new Date(`${today}T00:00:00Z`).getTime() - 6 * 86400000).toISOString().slice(0, 10);
+  return `report-${start}_${today}.md`;
+}
+
+async function downloadWeeklyReport() {
+  const btn = $('export-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Формирую...'; }
+
+  try {
+    const res = await apiFetch(`/api/export/week/${userId}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+    const text = await res.text();
+    const blob = new Blob([text], { type: 'text/markdown;charset=utf-8' });
+    const url  = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = weekReportFilename();
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    console.error('[export] error:', err);
+    const msg = 'Не удалось сформировать отчёт. Попробуй ещё раз.';
+    tg.showAlert ? tg.showAlert(msg) : alert(msg);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '📄 Скачать отчёт за 7 дней'; }
+  }
+}
+
+$('export-btn')?.addEventListener('click', downloadWeeklyReport);
+
 /* ── Delete ────────────────────────────────────────────────────────────── */
 async function deleteLog(logId) {
   try {

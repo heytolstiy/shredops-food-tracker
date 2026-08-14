@@ -10,6 +10,7 @@ const {
 } = require('./handlers/food');
 const { supabase }   = require('../db/supabase');
 const { todayMSK }   = require('../utils/time');
+const { generateWeeklyReport } = require('../services/export');
 
 const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
 
@@ -79,6 +80,7 @@ bot.command('start', async (ctx) => {
       `/weight — записать/посмотреть вес\n` +
       `/steps — записать/посмотреть шаги\n` +
       `/targets — изменить цели по КБЖУ\n` +
+      `/week — отчёт за 7 дней (.md-файл)\n` +
       `/dashboard — открыть статистику\n` +
       `/profile — твои данные\n` +
       `/reset — заполнить анкету заново`
@@ -401,6 +403,45 @@ bot.command('targets', async (ctx) => {
   );
 });
 
+// ── /week — detailed 7-day export (.md document) ───────────────────────────
+// Shared generator with GET /api/export/week/:userId — one report, not two.
+
+bot.command(['week', 'неделя'], async (ctx) => {
+  const telegramId = ctx.from.id;
+
+  const { data: user, error: userError } = await supabase
+    .from('users')
+    .select('onboarding_complete')
+    .eq('telegram_id', telegramId)
+    .maybeSingle();
+
+  if (userError) {
+    console.error('[/week] user query error:', userError.message);
+    return ctx.reply('Что-то пошло не так. Попробуй ещё раз.');
+  }
+
+  if (!user?.onboarding_complete) {
+    return ctx.reply('Сначала заполни анкету — используй /start.');
+  }
+
+  await ctx.sendChatAction('upload_document');
+
+  try {
+    const report = await generateWeeklyReport(telegramId);
+    if (!report) {
+      return ctx.reply('Не удалось сформировать отчёт. Попробуй ещё раз.');
+    }
+
+    await ctx.replyWithDocument({
+      source:   Buffer.from(report.content, 'utf-8'),
+      filename: report.filename,
+    });
+  } catch (err) {
+    console.error('[/week] error:', err.message);
+    return ctx.reply('❌ Не удалось сформировать отчёт. Попробуй ещё раз.');
+  }
+});
+
 // ── /reset — re-runs the onboarding wizard from step 1 ───────────────────
 
 bot.command(['reset', 'сброс'], (ctx) => ctx.scene.enter('onboarding'));
@@ -427,13 +468,16 @@ bot.command('help', (ctx) => ctx.reply(
   `🎯 <b>Цели по КБЖУ:</b>\n` +
   `<code>/targets 2000 175 70 180</code> — задать калории/белки/жиры/углеводы вручную (порядок именно такой)\n` +
   `<code>/targets</code> — посмотреть текущие цели\n\n` +
+  `📄 <b>Отчёт:</b>\n` +
+  `<code>/week</code> — подробный отчёт за 7 дней (.md-файл): все приёмы пищи, вес, шаги, вода, итоги недели\n\n` +
   `📌 <b>Команды:</b>\n` +
   `/dashboard — открыть дашборд КБЖУ\n` +
   `/profile — пересчитать цели\n` +
   `/today — прогресс за сегодня\n` +
   `/weight — вес\n` +
   `/steps — шаги\n` +
-  `/targets — изменить цели`,
+  `/targets — изменить цели\n` +
+  `/week — отчёт за неделю`,
   { parse_mode: 'HTML' }
 ));
 
