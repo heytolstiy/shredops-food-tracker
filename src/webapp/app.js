@@ -254,7 +254,7 @@ function waterHTML(target, logged) {
   const pct         = Math.min(r(logged / (target || 1) * 100), 100);
 
   const cells = Array.from({ length: totalCells }, (_, i) =>
-    `<div class="water-cell${i < filledCells ? ' filled' : ''}"></div>`
+    `<div class="water-cell${i < filledCells ? ' filled' : ''}">💧</div>`
   ).join('');
 
   const hint = viewingPast
@@ -859,6 +859,21 @@ document.addEventListener('click', e => {
     logWater(waterCell);
   }
 });
+
+/* ── Tab bar — pure display toggle, no effect on data loading/rendering ── */
+let activeTab = 'today';
+
+function switchTab(tab) {
+  if (tab === activeTab) return;
+  activeTab = tab;
+  $('tab-today').classList.toggle('tab-hidden', tab !== 'today');
+  $('tab-activity').classList.toggle('tab-hidden', tab !== 'activity');
+  $('tab-btn-today').classList.toggle('active', tab === 'today');
+  $('tab-btn-activity').classList.toggle('active', tab === 'activity');
+}
+
+$('tab-btn-today').addEventListener('click', () => switchTab('today'));
+$('tab-btn-activity').addEventListener('click', () => switchTab('activity'));
 
 /* ── Boot ──────────────────────────────────────────────────────────────── */
 initTimeline();

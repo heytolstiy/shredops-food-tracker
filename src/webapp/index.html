@@ -18,27 +18,44 @@
 
   <div class="app">
     <div id="timeline" class="timeline"></div>
-    <div id="hero-section">
-      <div class="card hero">
-        <div class="sk sk-line sk-w45"></div>
-        <div class="sk sk-num"></div>
-        <div class="sk sk-bar"></div>
+
+    <div id="tab-today" class="tab-panel">
+      <div id="hero-section">
+        <div class="card hero">
+          <div class="sk sk-line sk-w45"></div>
+          <div class="sk sk-num"></div>
+          <div class="sk sk-bar"></div>
+        </div>
+      </div>
+      <div id="macro-section"></div>
+      <div id="log-section"></div>
+    </div>
+
+    <div id="tab-activity" class="tab-panel tab-hidden">
+      <div id="water-section"></div>
+      <div id="weight-section"></div>
+      <div id="steps-section"></div>
+      <div id="workout-section"></div>
+
+      <p class="section-label">Отчёт</p>
+      <div class="card export-card">
+        <button class="export-btn" id="export-btn" type="button">📄 Скачать отчёт за 7 дней</button>
+        <p class="export-hint">Полная статистика по дням — для диетолога/тренера</p>
       </div>
     </div>
-    <div id="macro-section"></div>
-    <div id="water-section"></div>
-    <div id="weight-section"></div>
-    <div id="steps-section"></div>
-    <div id="workout-section"></div>
-
-    <p class="section-label">Отчёт</p>
-    <div class="card export-card">
-      <button class="export-btn" id="export-btn" type="button">📄 Скачать отчёт за 7 дней</button>
-      <p class="export-hint">Полная статистика по дням — для диетолога/тренера</p>
-    </div>
-
-    <div id="log-section"></div>
   </div>
+
+  <!-- Bottom tab bar -->
+  <nav class="tab-bar">
+    <button class="tab-btn active" id="tab-btn-today" type="button">
+      <span class="tab-icon">🏠</span>
+      <span class="tab-label">Сегодня</span>
+    </button>
+    <button class="tab-btn" id="tab-btn-activity" type="button">
+      <span class="tab-icon">📊</span>
+      <span class="tab-label">Активность</span>
+    </button>
+  </nav>
 
   <!-- Edit modal -->
   <div id="edit-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
