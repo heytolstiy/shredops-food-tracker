@@ -48,6 +48,8 @@ let weightPending      = false;
 let currentSteps       = null;
 let stepsPending       = false;
 let currentUser        = null;
+let currentWorkout     = null;
+let workoutPending     = false;
 let activeDate         = mskToday();
 let viewingPast        = false;
 
@@ -417,6 +419,79 @@ function attachStepsHandlers() {
   $('steps-save-btn')?.addEventListener('click', saveSteps);
 }
 
+/* ── Render: workout section ───────────────────────────────────────────── */
+function workoutHTML(description, isPast) {
+  if (isPast) {
+    return `
+      <p class="section-label">Тренировка</p>
+      <div class="card workout-card">
+        ${description
+          ? `<p class="workout-display">${esc(description)}</p>`
+          : `<p class="workout-hint">Тренировка в этот день не записана.</p>`}
+      </div>`;
+  }
+
+  return `
+    <p class="section-label">Тренировка</p>
+    <div class="card workout-card">
+      <textarea class="workout-input" id="workout-input" rows="3"
+                placeholder="Присед 3x10, Жим лёжа 3x8, Тяга 3x8">${description ? esc(description) : ''}</textarea>
+      <button class="workout-save-btn" id="workout-save-btn" type="button">Сохранить</button>
+      <p class="workout-hint">Повторное сохранение за сегодня перезапишет текст.</p>
+    </div>`;
+}
+
+/* ── Workout: save today's entry (upsert, overwrite-safe) ────────────────── */
+async function saveWorkout() {
+  if (workoutPending || viewingPast) return;
+
+  const input = $('workout-input');
+  const val   = (input?.value || '').trim();
+
+  if (!val) {
+    const msg = 'Опиши тренировку текстом перед сохранением.';
+    tg.showAlert ? tg.showAlert(msg) : alert(msg);
+    return;
+  }
+  if (val.length > 2000) {
+    const msg = 'Слишком длинное описание (максимум 2000 символов).';
+    tg.showAlert ? tg.showAlert(msg) : alert(msg);
+    return;
+  }
+
+  workoutPending = true;
+  const btn = $('workout-save-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '...'; }
+
+  try {
+    const res = await apiFetch('/api/workout', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ userId, description: val }),
+    });
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `HTTP ${res.status}`);
+
+    const { description } = await res.json();
+    currentWorkout = description;
+    tg.HapticFeedback?.notificationOccurred?.('success');
+    $('workout-section').innerHTML = workoutHTML(description, false);
+    attachWorkoutHandlers();
+  } catch (err) {
+    console.error('[workout] POST error:', err);
+    const msg = 'Не удалось сохранить тренировку. Попробуй ещё раз.';
+    tg.showAlert ? tg.showAlert(msg) : alert(msg);
+  } finally {
+    workoutPending = false;
+    const btnAgain = $('workout-save-btn');
+    if (btnAgain) { btnAgain.disabled = false; btnAgain.textContent = 'Сохранить'; }
+  }
+}
+
+// Re-bind after every innerHTML replace — the button element is recreated each render
+function attachWorkoutHandlers() {
+  $('workout-save-btn')?.addEventListener('click', saveWorkout);
+}
+
 /* ── Render: log card ──────────────────────────────────────────────────── */
 function logCard(entry) {
   const name   = entry.raw_ai_response?.identified_food || entry.description;
@@ -453,13 +528,14 @@ function logCard(entry) {
 
 /* ── Main render ───────────────────────────────────────────────────────── */
 function render(data) {
-  const { user, logs, date, waterLogged, weightKg, steps } = data;
+  const { user, logs, date, waterLogged, weightKg, steps, workout } = data;
   currentLogs        = logs;
   currentWaterLogged = waterLogged || 0;
   currentWaterTarget = user.target_water_ml || 2500;
   currentWeightKg    = weightKg ?? null;
   currentSteps       = steps ?? null;
   currentUser        = user;
+  currentWorkout     = workout ?? null;
 
   const totals = logs.reduce(
     (a, e) => ({
@@ -495,6 +571,9 @@ function render(data) {
 
   $('steps-section').innerHTML = stepsHTML(currentSteps, viewingPast);
   attachStepsHandlers();
+
+  $('workout-section').innerHTML = workoutHTML(currentWorkout, viewingPast);
+  attachWorkoutHandlers();
 
   const emptyMsg = viewingPast
     ? 'В этот день ничего не записано.'
@@ -533,11 +612,12 @@ function showError(msg) {
       <div class="error-icon">⚠️</div>
       ${msg}
     </div>`;
-  $('macro-section').innerHTML  = '';
-  $('water-section').innerHTML  = '';
-  $('weight-section').innerHTML = '';
-  $('steps-section').innerHTML  = '';
-  $('log-section').innerHTML    = '';
+  $('macro-section').innerHTML   = '';
+  $('water-section').innerHTML   = '';
+  $('weight-section').innerHTML  = '';
+  $('steps-section').innerHTML   = '';
+  $('workout-section').innerHTML = '';
+  $('log-section').innerHTML     = '';
 }
 
 /* ── Water: counter-only DOM update (no full re-render) ─────────────────  */

@@ -34,7 +34,7 @@ async function generateWeeklyReport(telegramId) {
   const startDate = daysAgoMSK(6);
   const dates = Array.from({ length: 7 }, (_, i) => daysAgoMSK(6 - i)); // oldest → newest
 
-  const [userResult, logsResult, targetsResult, weightResult, stepsResult, waterResult] = await Promise.all([
+  const [userResult, logsResult, targetsResult, weightResult, stepsResult, waterResult, workoutResult] = await Promise.all([
     supabase
       .from('users')
       .select('first_name, username, daily_calories, daily_protein_g, daily_fat_g, daily_carbs_g')
@@ -71,13 +71,19 @@ async function generateWeeklyReport(telegramId) {
       .eq('telegram_id', telegramId)
       .gte('log_date', startDate)
       .lte('log_date', today),
+    supabase
+      .from('workout_logs')
+      .select('log_date, description')
+      .eq('telegram_id', telegramId)
+      .gte('log_date', startDate)
+      .lte('log_date', today),
   ]);
 
   if (!userResult.data) return null;
 
   for (const [label, r] of [
     ['food_logs', logsResult], ['daily_targets', targetsResult], ['weight_logs', weightResult],
-    ['steps_logs', stepsResult], ['water_logs', waterResult],
+    ['steps_logs', stepsResult], ['water_logs', waterResult], ['workout_logs', workoutResult],
   ]) {
     if (r.error) console.error(`[export] ${label} query error:`, r.error.message);
   }
@@ -88,6 +94,7 @@ async function generateWeeklyReport(telegramId) {
   const targetsByDate = indexByDate(targetsResult.data ?? []);
   const weightByDate  = indexByDate(weightResult.data ?? [], 'weight_kg');
   const stepsByDate   = indexByDate(stepsResult.data ?? [], 'steps');
+  const workoutByDate = indexByDate(workoutResult.data ?? [], 'description');
 
   const waterByDate = {};
   for (const row of waterResult.data ?? []) {
@@ -102,7 +109,7 @@ async function generateWeeklyReport(telegramId) {
   lines.push('## По дням');
 
   let calSum = 0, proSum = 0, fatSum = 0, carSum = 0, daysWithFood = 0, daysHitTarget = 0;
-  let stepsSum = 0, stepsCount = 0, waterSum = 0, waterCount = 0;
+  let stepsSum = 0, stepsCount = 0, waterSum = 0, waterCount = 0, workoutDays = 0;
   const weighIns = [];
 
   for (const date of dates) {
@@ -160,6 +167,10 @@ async function generateWeeklyReport(telegramId) {
     const steps = stepsByDate[date];
     lines.push(`Шаги: ${steps != null ? steps : 'нет данных'}`);
     if (steps != null) { stepsSum += steps; stepsCount++; }
+
+    const workout = workoutByDate[date];
+    lines.push(`Тренировка: ${workout || 'не было'}`);
+    if (workout) workoutDays++;
   }
 
   lines.push('');
@@ -194,6 +205,8 @@ async function generateWeeklyReport(telegramId) {
   lines.push(waterCount > 0
     ? `Вода: среднее ${Math.round(waterSum / waterCount)} мл/день (${waterCount} из 7 дней с данными)`
     : 'Вода: нет данных за неделю.');
+
+  lines.push(`Тренировок за неделю: ${workoutDays} из 7 дней`);
 
   return {
     content:  lines.join('\n') + '\n',

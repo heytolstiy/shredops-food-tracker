@@ -79,6 +79,7 @@ bot.command('start', async (ctx) => {
       `/today — прогресс за день\n` +
       `/weight — записать/посмотреть вес\n` +
       `/steps — записать/посмотреть шаги\n` +
+      `/workout — записать тренировку за сегодня\n` +
       `/targets — изменить цели по КБЖУ\n` +
       `/week — отчёт за 7 дней (.md-файл)\n` +
       `/dashboard — открыть статистику\n` +
@@ -321,6 +322,85 @@ bot.command(['steps', 'шаги'], async (ctx) => {
   return ctx.reply(`✅ Шаги записаны: <b>${steps}</b> — ${today}`, { parse_mode: 'HTML' });
 });
 
+// ── /workout — free-text daily training note ────────────────────────────────
+// Same overwrite-on-re-entry semantics as /weight and /steps: one entry per
+// day, always today, upserted on re-entry. Not a workout tracker — just a
+// text record so the weekly export can show training days. No date picking:
+// entries always target today, same as everything else in this bot.
+
+bot.command(['workout', 'тренировка'], async (ctx) => {
+  const telegramId = ctx.from.id;
+  const text = ctx.message.text.trim();
+  const spaceIdx = text.indexOf(' ');
+  const description = spaceIdx === -1 ? null : text.slice(spaceIdx + 1).trim();
+
+  const { data: user, error: userError } = await supabase
+    .from('users')
+    .select('onboarding_complete')
+    .eq('telegram_id', telegramId)
+    .maybeSingle();
+
+  if (userError) {
+    console.error('[/workout] user query error:', userError.message);
+    return ctx.reply('Что-то пошло не так. Попробуй ещё раз.');
+  }
+
+  if (!user?.onboarding_complete) {
+    return ctx.reply('Сначала заполни анкету — используй /start.');
+  }
+
+  // No text — show today's recorded workout
+  if (!description) {
+    const today = todayMSK();
+
+    const { data: todayEntry, error } = await supabase
+      .from('workout_logs')
+      .select('description')
+      .eq('telegram_id', telegramId)
+      .eq('log_date', today)
+      .maybeSingle();
+
+    if (error) {
+      console.error('[/workout] today-entry query error:', error.message);
+      return ctx.reply('Не удалось загрузить данные. Попробуй ещё раз.');
+    }
+
+    if (!todayEntry) {
+      return ctx.reply(
+        `🏋️ Тренировка за сегодня не записана.\n\n` +
+        `Чтобы записать: <code>/workout Присед 3x10, Жим лёжа 3x8</code>`,
+        { parse_mode: 'HTML' }
+      );
+    }
+
+    return ctx.reply(
+      `🏋️ Сегодня: ${todayEntry.description}\n\n` +
+      `Обновить: <code>/workout ...</code>`,
+      { parse_mode: 'HTML' }
+    );
+  }
+
+  if (description.length > 2000) {
+    return ctx.reply('⚠️ Слишком длинное описание (максимум 2000 символов).');
+  }
+
+  const today = todayMSK();
+
+  const { error: upsertError } = await supabase
+    .from('workout_logs')
+    .upsert(
+      { telegram_id: telegramId, log_date: today, description, logged_at: new Date().toISOString() },
+      { onConflict: 'telegram_id,log_date' }
+    );
+
+  if (upsertError) {
+    console.error('[/workout] upsert error:', upsertError.message);
+    return ctx.reply('❌ Не удалось сохранить тренировку. Попробуй ещё раз.');
+  }
+
+  return ctx.reply(`✅ Тренировка записана — ${today}`, { parse_mode: 'HTML' });
+});
+
 // ── /targets — manual daily calorie/macro correction ───────────────────────
 // Direct override of users.daily_calories/daily_protein_g/daily_fat_g/
 // daily_carbs_g — bypasses calculateTDEE/calculateMacros entirely. This is
@@ -465,6 +545,9 @@ bot.command('help', (ctx) => ctx.reply(
   `👟 <b>Шаги:</b>\n` +
   `<code>/steps 8500</code> — записать шаги за сегодня (повторный ввод перезаписывает)\n` +
   `<code>/steps</code> — посмотреть сегодняшнее значение\n\n` +
+  `🏋️ <b>Тренировка:</b>\n` +
+  `<code>/workout Присед 3x10, Жим лёжа 3x8</code> — записать тренировку за сегодня текстом (повторный ввод перезаписывает)\n` +
+  `<code>/workout</code> — посмотреть сегодняшнюю запись\n\n` +
   `🎯 <b>Цели по КБЖУ:</b>\n` +
   `<code>/targets 2000 175 70 180</code> — задать калории/белки/жиры/углеводы вручную (порядок именно такой)\n` +
   `<code>/targets</code> — посмотреть текущие цели\n\n` +
@@ -476,6 +559,7 @@ bot.command('help', (ctx) => ctx.reply(
   `/today — прогресс за сегодня\n` +
   `/weight — вес\n` +
   `/steps — шаги\n` +
+  `/workout — тренировка\n` +
   `/targets — изменить цели\n` +
   `/week — отчёт за неделю`,
   { parse_mode: 'HTML' }

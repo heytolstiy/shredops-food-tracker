@@ -16,6 +16,7 @@
   --pink:   #ff2d78;
   --blue:   #00aaff;
   --red:    #ff4444;
+  --amber:  #ffaa00;
 
   /* Chrome track: liquid-silver gradient */
   --chrome: linear-gradient(90deg,
@@ -955,6 +956,54 @@ body {
   font-size: 11px;
   letter-spacing: 0.03em;
   color: var(--t3);
+}
+
+/* ── Workout section ──────────────────────────────────────────────────────── */
+.workout-input {
+  display: block;
+  width: 100%;
+  resize: vertical;
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  font-size: 14px;
+  color: var(--t1);
+}
+.workout-input:focus { outline: none; border-color: var(--amber); }
+.workout-input::placeholder { color: var(--t3); }
+
+.workout-save-btn {
+  width: 100%;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 10px 16px;
+  background: var(--amber);
+  color: #1a1200;
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.workout-save-btn:active   { transform: scale(0.97); }
+.workout-save-btn:disabled { opacity: 0.6; cursor: default; }
+
+.workout-hint {
+  margin-top: 8px;
+  text-align: center;
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  color: var(--t3);
+}
+
+.workout-display {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--t1);
+  white-space: pre-wrap;
 }
 
 /* ── Historical timeline ─────────────────────────────────────────────────── */
