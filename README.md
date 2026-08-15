@@ -158,6 +158,7 @@ Both the Express API and the Telegraf bot start from the same `index.js` entry p
 
 ## Web App (Mini App) Features
 
+- **Light/dark theme** — follows the Telegram client's own colorScheme automatically (no in-app toggle); switches live if the user changes their Telegram theme while the app is open
 - **Hero card** — big calorie number with progress bar, goal badge, surplus/deficit display
 - **Macro grid** — protein / fat / carbs with individual progress bars
 - **Water tracker** — gamified power cells (250 ml each), tap to log

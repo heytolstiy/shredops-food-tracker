@@ -7,6 +7,15 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <!-- Set the theme before style.css is applied, so a dark-mode Telegram
+       client never shows a flash of the light theme on load. app.js re-runs
+       the same check (harmless) and also listens for live theme switches. -->
+  <script>
+    (function () {
+      var wa = window.Telegram && window.Telegram.WebApp;
+      document.documentElement.setAttribute('data-theme', wa && wa.colorScheme === 'dark' ? 'dark' : 'light');
+    })();
+  </script>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>

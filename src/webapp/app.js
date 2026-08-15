@@ -5,6 +5,13 @@ const tg = window.Telegram?.WebApp ?? {};
 tg.ready?.();
 tg.expand?.();
 
+/* ── Theme — follows Telegram's own light/dark setting, not a manual toggle */
+function applyTelegramTheme() {
+  document.documentElement.setAttribute('data-theme', tg.colorScheme === 'dark' ? 'dark' : 'light');
+}
+applyTelegramTheme();
+tg.onEvent?.('themeChanged', applyTelegramTheme);
+
 const userId =
   tg.initDataUnsafe?.user?.id ||
   parseInt(new URLSearchParams(window.location.search).get('uid'), 10) ||
