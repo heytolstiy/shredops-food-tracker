@@ -168,9 +168,19 @@ async function generateWeeklyReport(telegramId) {
     lines.push(`Шаги: ${steps != null ? steps : 'нет данных'}`);
     if (steps != null) { stepsSum += steps; stepsCount++; }
 
+    // Workout notes may be a single free-text line (typed via the bot) or
+    // multiple lines (one per exercise, built by the Mini App's structured
+    // form) — either way, each non-empty line becomes its own bullet.
     const workout = workoutByDate[date];
-    lines.push(`Тренировка: ${workout || 'не было'}`);
-    if (workout) workoutDays++;
+    if (workout) {
+      lines.push('Тренировка:');
+      for (const line of workout.split('\n').map(l => l.trim()).filter(Boolean)) {
+        lines.push(`- ${line}`);
+      }
+      workoutDays++;
+    } else {
+      lines.push('Тренировка: не было');
+    }
   }
 
   lines.push('');

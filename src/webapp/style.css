@@ -907,21 +907,92 @@ body {
 }
 
 /* ── Workout section ──────────────────────────────────────────────────────── */
-.workout-input {
-  display: block;
-  width: 100%;
-  resize: vertical;
+.workout-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.workout-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.workout-name-input {
+  flex: 1;
+  min-width: 0;
   background: var(--surface2);
   border: 1px solid var(--border2);
   border-radius: var(--radius-sm);
   padding: 10px 12px;
-  margin-bottom: 10px;
   font-family: 'Manrope', system-ui, sans-serif;
   font-size: 14px;
+  font-weight: 600;
   color: var(--t1);
 }
-.workout-input:focus { outline: none; border-color: var(--amber); }
-.workout-input::placeholder { color: var(--t3); }
+.workout-name-input:focus { outline: none; border-color: var(--amber); }
+.workout-name-input::placeholder { color: var(--t3); font-weight: 500; }
+
+.workout-sets-input {
+  width: 56px;
+  flex-shrink: 0;
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-sm);
+  padding: 10px 6px;
+  text-align: center;
+  font-family: 'Manrope', system-ui, sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--t1);
+}
+.workout-sets-input:focus { outline: none; border-color: var(--amber); }
+.workout-sets-input::placeholder { color: var(--t3); font-weight: 500; }
+.workout-sets-input::-webkit-outer-spin-button,
+.workout-sets-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.workout-sets-input[type=number] { -moz-appearance: textfield; }
+
+.workout-sets-suffix {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--t3);
+}
+
+.workout-remove-row {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(239,68,68,0.10);
+  color: var(--red);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.workout-remove-row:active { transform: scale(0.92); }
+
+.workout-add-row {
+  display: block;
+  width: 100%;
+  border: 1px dashed var(--border2);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--t2);
+  padding: 9px 12px;
+  margin-bottom: 10px;
+  font-family: 'Manrope', system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.workout-add-row:active { transform: scale(0.98); }
 
 .workout-save-btn {
   width: 100%;

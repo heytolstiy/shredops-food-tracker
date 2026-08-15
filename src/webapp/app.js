@@ -420,6 +420,22 @@ function attachStepsHandlers() {
 }
 
 /* ── Render: workout section ───────────────────────────────────────────── */
+// Structured input (name + set count, assumed 10 reps/set) that assembles
+// into the same plain-text `description` the backend has always stored —
+// no schema/API change, just a friendlier way to build that string. Editing
+// always starts from a blank form: past entries (however they were written —
+// via this form or the bot's free-text /workout) are never parsed back into
+// rows, they just get overwritten on save like weight/steps already do.
+function workoutRowHTML(name = '', sets = '') {
+  return `
+    <div class="workout-row">
+      <input class="workout-name-input" type="text" placeholder="Упражнение" value="${esc(name)}">
+      <input class="workout-sets-input" type="number" inputmode="numeric" min="1" max="20" placeholder="Подх." value="${esc(sets)}">
+      <span class="workout-sets-suffix">×10</span>
+      <button class="workout-remove-row" type="button" aria-label="Удалить">✕</button>
+    </div>`;
+}
+
 function workoutHTML(description, isPast) {
   if (isPast) {
     return `
@@ -434,27 +450,37 @@ function workoutHTML(description, isPast) {
   return `
     <p class="section-label">Тренировка</p>
     <div class="card workout-card">
-      <textarea class="workout-input" id="workout-input" rows="3"
-                placeholder="Присед 3x10, Жим лёжа 3x8, Тяга 3x8">${description ? esc(description) : ''}</textarea>
+      <div class="workout-rows" id="workout-rows">${workoutRowHTML()}</div>
+      <button class="workout-add-row" id="workout-add-row" type="button">+ Добавить упражнение</button>
       <button class="workout-save-btn" id="workout-save-btn" type="button">Сохранить</button>
-      <p class="workout-hint">Повторное сохранение за сегодня перезапишет текст.</p>
+      <p class="workout-hint">Подход = 10 повторов. Повторное сохранение за сегодня перезапишет запись.</p>
     </div>`;
+}
+
+/* ── Workout: collect filled rows → "Название — Nx10" per line ───────────── */
+function collectWorkoutRows() {
+  return [...document.querySelectorAll('#workout-rows .workout-row')]
+    .map(row => ({
+      name: row.querySelector('.workout-name-input')?.value.trim() || '',
+      sets: row.querySelector('.workout-sets-input')?.value.trim() || '',
+    }))
+    .filter(r => r.name && r.sets);
 }
 
 /* ── Workout: save today's entry (upsert, overwrite-safe) ────────────────── */
 async function saveWorkout() {
   if (workoutPending || viewingPast) return;
 
-  const input = $('workout-input');
-  const val   = (input?.value || '').trim();
-
-  if (!val) {
-    const msg = 'Опиши тренировку текстом перед сохранением.';
+  const rows = collectWorkoutRows();
+  if (!rows.length) {
+    const msg = 'Добавь хотя бы одно упражнение с числом подходов.';
     tg.showAlert ? tg.showAlert(msg) : alert(msg);
     return;
   }
-  if (val.length > 2000) {
-    const msg = 'Слишком длинное описание (максимум 2000 символов).';
+
+  const description = rows.map(r => `${r.name} — ${r.sets}×10`).join('\n');
+  if (description.length > 2000) {
+    const msg = 'Слишком длинная запись (максимум 2000 символов).';
     tg.showAlert ? tg.showAlert(msg) : alert(msg);
     return;
   }
@@ -467,29 +493,42 @@ async function saveWorkout() {
     const res = await apiFetch('/api/workout', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ userId, description: val }),
+      body:    JSON.stringify({ userId, description }),
     });
     if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `HTTP ${res.status}`);
 
-    const { description } = await res.json();
+    await res.json();
     currentWorkout = description;
     tg.HapticFeedback?.notificationOccurred?.('success');
-    $('workout-section').innerHTML = workoutHTML(description, false);
-    attachWorkoutHandlers();
+    if (btn) btn.textContent = 'Сохранено ✓';
+    setTimeout(() => { if (btn && !workoutPending) btn.textContent = 'Сохранить'; }, 1200);
   } catch (err) {
     console.error('[workout] POST error:', err);
+    if (btn) btn.textContent = 'Сохранить';
     const msg = 'Не удалось сохранить тренировку. Попробуй ещё раз.';
     tg.showAlert ? tg.showAlert(msg) : alert(msg);
   } finally {
     workoutPending = false;
-    const btnAgain = $('workout-save-btn');
-    if (btnAgain) { btnAgain.disabled = false; btnAgain.textContent = 'Сохранить'; }
+    if (btn) btn.disabled = false;
   }
 }
 
-// Re-bind after every innerHTML replace — the button element is recreated each render
+// Re-bind after every innerHTML replace — elements are recreated each render
 function attachWorkoutHandlers() {
   $('workout-save-btn')?.addEventListener('click', saveWorkout);
+  $('workout-add-row')?.addEventListener('click', () => {
+    $('workout-rows')?.insertAdjacentHTML('beforeend', workoutRowHTML());
+  });
+  $('workout-rows')?.addEventListener('click', e => {
+    if (!e.target.closest('.workout-remove-row')) return;
+    const rows = $('workout-rows');
+    const row  = e.target.closest('.workout-row');
+    row?.remove();
+    // Never leave zero rows — always keep one ready to type into
+    if (rows && !rows.querySelector('.workout-row')) {
+      rows.insertAdjacentHTML('beforeend', workoutRowHTML());
+    }
+  });
 }
 
 /* ── Render: log card ──────────────────────────────────────────────────── */
