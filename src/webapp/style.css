@@ -962,32 +962,23 @@ body {
 .workout-name-input:focus { outline: none; border-color: var(--amber); }
 .workout-name-input::placeholder { color: var(--t3); font-weight: 500; }
 
-.workout-sets-input {
-  width: 56px;
-  flex-shrink: 0;
+/* Free text, not a fixed number — cardio (minutes/speed) and per-set-varying
+   weight (pyramid sets) don't fit a single "sets × assumed reps" number. */
+.workout-detail-input {
+  flex: 1.2;
+  min-width: 0;
   background: var(--surface2);
   border: 1px solid var(--border2);
   border-radius: var(--radius-sm);
-  padding: 10px 6px;
-  text-align: center;
+  padding: 10px 12px;
   font-family: 'Manrope', system-ui, sans-serif;
-  font-size: 14px;
-  font-weight: 700;
+  font-size: 13px;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
   color: var(--t1);
 }
-.workout-sets-input:focus { outline: none; border-color: var(--amber); }
-.workout-sets-input::placeholder { color: var(--t3); font-weight: 500; }
-.workout-sets-input::-webkit-outer-spin-button,
-.workout-sets-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-.workout-sets-input[type=number] { -moz-appearance: textfield; }
-
-.workout-sets-suffix {
-  flex-shrink: 0;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--t3);
-}
+.workout-detail-input:focus { outline: none; border-color: var(--amber); }
+.workout-detail-input::placeholder { color: var(--t3); font-weight: 500; }
 
 .workout-remove-row {
   flex-shrink: 0;

@@ -420,18 +420,20 @@ function attachStepsHandlers() {
 }
 
 /* ── Render: workout section ───────────────────────────────────────────── */
-// Structured input (name + set count, assumed 10 reps/set) that assembles
-// into the same plain-text `description` the backend has always stored —
-// no schema/API change, just a friendlier way to build that string. Editing
-// always starts from a blank form: past entries (however they were written —
-// via this form or the bot's free-text /workout) are never parsed back into
-// rows, they just get overwritten on save like weight/steps already do.
-function workoutRowHTML(name = '', sets = '') {
+// Structured input (name + free-text detail) that assembles into the same
+// plain-text `description` the backend has always stored — no schema/API
+// change, just a friendlier way to build that string. The detail field is
+// deliberately free text, not a fixed "sets × assumed reps" number: that
+// assumption doesn't hold for cardio (minutes/speed/distance) or for
+// strength sets with varying weight per set (pyramid: 40×10, 50×8, 60×6).
+// Editing always starts from a blank form: past entries (however they were
+// written — via this form or the bot's free-text /workout) are never parsed
+// back into rows, they just get overwritten on save like weight/steps already do.
+function workoutRowHTML(name = '', detail = '') {
   return `
     <div class="workout-row">
       <input class="workout-name-input" type="text" placeholder="Упражнение" value="${esc(name)}">
-      <input class="workout-sets-input" type="number" inputmode="numeric" min="1" max="20" placeholder="Подх." value="${esc(sets)}">
-      <span class="workout-sets-suffix">×10</span>
+      <input class="workout-detail-input" type="text" placeholder="3×10, 40кг / 20 мин, 8 км/ч" value="${esc(detail)}">
       <button class="workout-remove-row" type="button" aria-label="Удалить">✕</button>
     </div>`;
 }
@@ -453,18 +455,18 @@ function workoutHTML(description, isPast) {
       <div class="workout-rows" id="workout-rows">${workoutRowHTML()}</div>
       <button class="workout-add-row" id="workout-add-row" type="button">+ Добавить упражнение</button>
       <button class="workout-save-btn" id="workout-save-btn" type="button">Сохранить</button>
-      <p class="workout-hint">Подход = 10 повторов. Повторное сохранение за сегодня перезапишет запись.</p>
+      <p class="workout-hint">Пиши как удобно: подходы, вес, время, дистанция. Повторное сохранение за сегодня перезапишет запись.</p>
     </div>`;
 }
 
-/* ── Workout: collect filled rows → "Название — Nx10" per line ───────────── */
+/* ── Workout: collect filled rows → "Название — деталь" per line ─────────── */
 function collectWorkoutRows() {
   return [...document.querySelectorAll('#workout-rows .workout-row')]
     .map(row => ({
-      name: row.querySelector('.workout-name-input')?.value.trim() || '',
-      sets: row.querySelector('.workout-sets-input')?.value.trim() || '',
+      name:   row.querySelector('.workout-name-input')?.value.trim() || '',
+      detail: row.querySelector('.workout-detail-input')?.value.trim() || '',
     }))
-    .filter(r => r.name && r.sets);
+    .filter(r => r.name && r.detail);
 }
 
 /* ── Workout: save today's entry (upsert, overwrite-safe) ────────────────── */
@@ -473,12 +475,12 @@ async function saveWorkout() {
 
   const rows = collectWorkoutRows();
   if (!rows.length) {
-    const msg = 'Добавь хотя бы одно упражнение с числом подходов.';
+    const msg = 'Добавь хотя бы одно упражнение с деталями (подходы, время и т.д.).';
     tg.showAlert ? tg.showAlert(msg) : alert(msg);
     return;
   }
 
-  const description = rows.map(r => `${r.name} — ${r.sets}×10`).join('\n');
+  const description = rows.map(r => `${r.name} — ${r.detail}`).join('\n');
   if (description.length > 2000) {
     const msg = 'Слишком длинная запись (максимум 2000 символов).';
     tg.showAlert ? tg.showAlert(msg) : alert(msg);
