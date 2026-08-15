@@ -433,9 +433,12 @@ function attachStepsHandlers() {
 // deliberately free text, not a fixed "sets × assumed reps" number: that
 // assumption doesn't hold for cardio (minutes/speed/distance) or for
 // strength sets with varying weight per set (pyramid: 40×10, 50×8, 60×6).
-// Editing always starts from a blank form: past entries (however they were
-// written — via this form or the bot's free-text /workout) are never parsed
-// back into rows, they just get overwritten on save like weight/steps already do.
+// Editing loads today's already-saved entry back into rows (one per line),
+// so re-opening the app after saving doesn't look like the save was lost —
+// that was the actual bug: the form always rendered blank regardless of
+// what was already saved, even though it WAS saved correctly (the /week
+// export always read it right). Each row can now be edited or removed, and
+// "+" still adds new ones.
 function workoutRowHTML(name = '', detail = '') {
   return `
     <div class="workout-row">
@@ -443,6 +446,19 @@ function workoutRowHTML(name = '', detail = '') {
       <input class="workout-detail-input" type="text" placeholder="3×10, 40кг / 20 мин, 8 км/ч" value="${esc(detail)}">
       <button class="workout-remove-row" type="button" aria-label="Удалить">✕</button>
     </div>`;
+}
+
+// "Название — деталь" per line is our own assembled format (see saveWorkout);
+// a line that doesn't match it (e.g. typed via the bot's free-text /workout)
+// degrades gracefully into a row with the whole line as the name, empty detail.
+function parseWorkoutRows(description) {
+  if (!description) return [];
+  return description.split('\n').map(l => l.trim()).filter(Boolean).map(line => {
+    const sepIdx = line.indexOf(' — ');
+    return sepIdx === -1
+      ? { name: line, detail: '' }
+      : { name: line.slice(0, sepIdx).trim(), detail: line.slice(sepIdx + 3).trim() };
+  });
 }
 
 function workoutHTML(description, isPast) {
@@ -456,10 +472,15 @@ function workoutHTML(description, isPast) {
       </div>`;
   }
 
+  const rows = parseWorkoutRows(description);
+  const rowsHTML = rows.length
+    ? rows.map(r => workoutRowHTML(r.name, r.detail)).join('')
+    : workoutRowHTML();
+
   return `
     <p class="section-label">Тренировка</p>
     <div class="card workout-card">
-      <div class="workout-rows" id="workout-rows">${workoutRowHTML()}</div>
+      <div class="workout-rows" id="workout-rows">${rowsHTML}</div>
       <button class="workout-add-row" id="workout-add-row" type="button">+ Добавить упражнение</button>
       <button class="workout-save-btn" id="workout-save-btn" type="button">Сохранить</button>
       <p class="workout-hint">Пиши как удобно: подходы, вес, время, дистанция. Повторное сохранение за сегодня перезапишет запись.</p>

@@ -154,6 +154,8 @@ Both the Express API and the Telegraf bot start from the same `index.js` entry p
 | Text only | Plain message with food name and weight | `"Гречка отварная 200г"` |
 | Manual entry | Structured prefix format | `"Ручной ввод: Куриная грудка, 165, 31, 3, 0"` |
 
+AI-analyzed entries (photo/text) show a `Надёжность` (reliability) indicator in the preview — 🟢 high / 🟡 medium / 🔴 low — so a rough restaurant/delivery guess is visibly flagged as less trustworthy than a precisely-described home meal. The estimator is deliberately biased to round calorie-relevant unknowns (oil, sauces, portion size) up rather than down, since underestimating breaks calorie-deficit tracking more than a small overestimate does.
+
 ---
 
 ## Web App (Mini App) Features

@@ -16,12 +16,16 @@ function sign(n) {
 
 // ── Preview helpers ─────────────────────────────────────────────────────────
 
+const RELIABILITY_LABEL = { high: '🟢 высокая', medium: '🟡 средняя', low: '🔴 низкая' };
+
 function buildPreviewText(nutrition) {
   const w = nutrition.assumed_weight_g > 0 ? ` (${nutrition.assumed_weight_g}г)` : '';
+  const reliability = RELIABILITY_LABEL[nutrition.reliability] ?? RELIABILITY_LABEL.medium;
   return (
     `🍽 <b>${nutrition.identified_food}${w}</b>\n` +
     `💭 <i>${nutrition.assumptions}</i>\n\n` +
-    `🔥 ${nutrition.calories} ккал  |  🥩 ${nutrition.protein}г  |  🧈 ${nutrition.fat}г  |  🍞 ${nutrition.carbs}г\n\n` +
+    `🔥 ${nutrition.calories} ккал  |  🥩 ${nutrition.protein}г  |  🧈 ${nutrition.fat}г  |  🍞 ${nutrition.carbs}г\n` +
+    `Надёжность: ${reliability}\n\n` +
     `Верно? Нажми «✅ Сохранить».\n` +
     `Нужно исправить вес или состав? Просто напиши в чат (например: «было 400г» или «добавь сыр»).`
   );
@@ -66,6 +70,7 @@ async function insertLog(ctx, nutrition, description, photoFileId) {
       identified_food:  nutrition.identified_food,
       assumed_weight_g: nutrition.assumed_weight_g,
       assumptions:      nutrition.assumptions ?? null,
+      reliability:      nutrition.reliability ?? null,
       raw:              nutrition.raw ?? null,
       ...(nutrition.raw === null ? { manual: true } : {}),
     },
