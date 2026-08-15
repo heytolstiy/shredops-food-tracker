@@ -121,12 +121,11 @@ body {
 /* ── Card ───────────────────────────────────────────────────────────────── */
 .card {
   background: var(--surface);
-  border: 1px solid rgba(255,255,255,0.6);
   border-radius: var(--radius);
   padding: var(--pad);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  box-shadow: 0 4px 18px rgba(30,50,100,0.07), 0 1px 3px rgba(30,50,100,0.05);
+  box-shadow: 0 3px 16px rgba(30,50,100,0.06), 0 1px 2px rgba(30,50,100,0.04);
 }
 
 /* ── Section label ────────────────────────────────────────────────────────── */
@@ -164,7 +163,14 @@ body {
 .section-edit-btn:active { transform: scale(0.95); }
 
 /* ─────────────────────────── HERO ────────────────────────────────────── */
-.hero { position: relative; overflow: hidden; }
+/* Hero gets its own tinted background instead of the plain card surface —
+   a stronger visual anchor at the top of the page, the rest of the cards
+   stay neutral so the hierarchy reads clearly. */
+.hero {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(160deg, rgba(124,92,255,0.14) 0%, rgba(14,165,233,0.10) 100%), var(--surface);
+}
 
 .hero-top {
   display: flex;
@@ -209,10 +215,10 @@ body {
   margin-bottom: 4px;
 }
 .hero-num {
-  font-size: 68px;
+  font-size: 72px;
   font-weight: 800;
-  line-height: 1;
-  letter-spacing: -2px;
+  line-height: 0.95;
+  letter-spacing: -3px;
   font-variant-numeric: tabular-nums;
   color: var(--t1);
 }
@@ -743,11 +749,20 @@ body {
   transition: opacity 0.15s ease;
 }
 
+/* ── Metric pair — weight + steps side by side, bento-style ───────────────── */
+/* Each child (#weight-section / #steps-section) becomes one grid column;
+   its own label + card still stack normally inside that column. */
+.metric-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--gap);
+}
+
 /* ── Weight section ───────────────────────────────────────────────────────── */
 .weight-row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .weight-input {
@@ -776,20 +791,27 @@ body {
   flex-shrink: 0;
 }
 
+/* Compact square icon button — needed once weight/steps sit side by side
+   in .metric-pair, a full-width "Сохранить" label no longer fits. */
 .weight-save-btn {
   flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border: none;
   border-radius: var(--radius-sm);
-  padding: 10px 16px;
+  padding: 0;
   background: var(--violet);
   color: #fff;
   font-family: 'Manrope', system-ui, sans-serif;
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 700;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
-.weight-save-btn:active   { transform: scale(0.96); }
+.weight-save-btn:active   { transform: scale(0.94); }
 .weight-save-btn:disabled { opacity: 0.6; cursor: default; }
 
 .weight-hint {
@@ -841,18 +863,23 @@ body {
 
 .steps-save-btn {
   flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border: none;
   border-radius: var(--radius-sm);
-  padding: 10px 16px;
+  padding: 0;
   background: var(--pink);
   color: #fff;
   font-family: 'Manrope', system-ui, sans-serif;
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 700;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
-.steps-save-btn:active   { transform: scale(0.96); }
+.steps-save-btn:active   { transform: scale(0.94); }
 .steps-save-btn:disabled { opacity: 0.6; cursor: default; }
 
 .steps-hint {

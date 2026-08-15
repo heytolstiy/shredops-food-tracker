@@ -296,7 +296,7 @@ function weightHTML(weightKg, isPast) {
                step="0.1" min="20" max="300"
                value="${weightKg != null ? weightKg : ''}" placeholder="—">
         <span class="weight-unit">кг</span>
-        <button class="weight-save-btn" id="weight-save-btn" type="button">Сохранить</button>
+        <button class="weight-save-btn" id="weight-save-btn" type="button" aria-label="Сохранить">✓</button>
       </div>
       <p class="weight-hint">Повторное сохранение за сегодня перезапишет значение.</p>
     </div>`;
@@ -339,7 +339,7 @@ async function saveWeight() {
   } finally {
     weightPending = false;
     const btnAgain = $('weight-save-btn');
-    if (btnAgain) { btnAgain.disabled = false; btnAgain.textContent = 'Сохранить'; }
+    if (btnAgain) { btnAgain.disabled = false; btnAgain.textContent = '✓'; }
   }
 }
 
@@ -367,7 +367,7 @@ function stepsHTML(steps, isPast) {
         <input class="steps-input" id="steps-input" type="number" inputmode="numeric"
                step="1" min="0" max="200000"
                value="${steps != null ? steps : ''}" placeholder="—">
-        <button class="steps-save-btn" id="steps-save-btn" type="button">Сохранить</button>
+        <button class="steps-save-btn" id="steps-save-btn" type="button" aria-label="Сохранить">✓</button>
       </div>
       <p class="steps-hint">Повторное сохранение за сегодня перезапишет значение.</p>
     </div>`;
@@ -410,7 +410,7 @@ async function saveSteps() {
   } finally {
     stepsPending = false;
     const btnAgain = $('steps-save-btn');
-    if (btnAgain) { btnAgain.disabled = false; btnAgain.textContent = 'Сохранить'; }
+    if (btnAgain) { btnAgain.disabled = false; btnAgain.textContent = '✓'; }
   }
 }
 
