@@ -74,10 +74,10 @@ const RU_DAYS  = ['ВС','ПН','ВТ','СР','ЧТ','ПТ','СБ'];
 
 /* ── Tier system — 4 levels based on current streak ────────────────────── */
 const TIERS = [
-  { min: 14, n: 4, label: 'ЛЕГЕНДА',  icon: '🏆', color: '#ff2d78', glow: 'rgba(255,45,120,0.55)',  bg: 'rgba(255,45,120,0.08)' },
-  { min:  7, n: 3, label: 'МАСТЕР',   icon: '⚡', color: '#9b5cf6', glow: 'rgba(155,92,246,0.55)', bg: 'rgba(155,92,246,0.08)' },
-  { min:  3, n: 2, label: 'БОЕЦ',     icon: '💪', color: '#00aaff', glow: 'rgba(0,170,255,0.55)',  bg: 'rgba(0,170,255,0.08)'  },
-  { min:  0, n: 1, label: 'НОВИЧОК',  icon: '🌱', color: '#00ff66', glow: 'rgba(0,255,102,0.45)', bg: 'rgba(0,255,102,0.07)'  },
+  { min: 14, n: 4, label: 'ЛЕГЕНДА',  icon: '🏆', color: '#ec4899', bg: 'rgba(236,72,153,0.12)' },
+  { min:  7, n: 3, label: 'МАСТЕР',   icon: '⚡', color: '#7c5cff', bg: 'rgba(124,92,255,0.12)' },
+  { min:  3, n: 2, label: 'БОЕЦ',     icon: '💪', color: '#0ea5e9', bg: 'rgba(14,165,233,0.12)' },
+  { min:  0, n: 1, label: 'НОВИЧОК',  icon: '🌱', color: '#16a34a', bg: 'rgba(22,163,74,0.10)'  },
 ];
 
 function getTier(streak) {
@@ -190,7 +190,7 @@ function heroHTML(user, totals, date) {
       <div class="hero-top">
         <div class="hero-top-left">
           <div class="hero-avatar"
-               style="--tier-color:${tier.color};--tier-glow:${tier.glow};--tier-bg:${tier.bg}">
+               style="--tier-color:${tier.color};--tier-bg:${tier.bg}">
             <span class="hero-avatar-icon">${tier.icon}</span>
             <span class="hero-avatar-tier">T${tier.n}&nbsp;${tier.label}</span>
           </div>
