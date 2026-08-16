@@ -127,6 +127,22 @@ CREATE INDEX IF NOT EXISTS idx_workout_logs_telegram_date
   ON workout_logs(telegram_id, log_date);
 
 
+-- ── SLEEP LOGS ────────────────────────────────────────────────────────────────
+-- One row per day (not per entry) — manual hours-of-sleep entry, same
+-- overwrite-on-re-entry semantics as weight_logs/steps_logs.
+CREATE TABLE IF NOT EXISTS sleep_logs (
+  id           BIGSERIAL PRIMARY KEY,
+  telegram_id  BIGINT NOT NULL REFERENCES users(telegram_id) ON DELETE CASCADE,
+  log_date     DATE   NOT NULL DEFAULT CURRENT_DATE,
+  hours        NUMERIC(4,2) NOT NULL CHECK (hours BETWEEN 0 AND 24),
+  logged_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (telegram_id, log_date)
+);
+
+CREATE INDEX IF NOT EXISTS idx_sleep_logs_telegram_date
+  ON sleep_logs(telegram_id, log_date);
+
+
 -- ── DAILY TARGETS ─────────────────────────────────────────────────────────────
 -- Freezes the calorie/macro target that was active for a given day, so a
 -- later change (via /targets or /reset) doesn't silently rewrite how past
@@ -172,5 +188,6 @@ ALTER TABLE water_logs   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE weight_logs  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE steps_logs   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE workout_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sleep_logs   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE daily_targets ENABLE ROW LEVEL SECURITY;
 ALTER TABLE bot_sessions ENABLE ROW LEVEL SECURITY;

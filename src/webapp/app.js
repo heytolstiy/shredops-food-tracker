@@ -57,6 +57,8 @@ let stepsPending       = false;
 let currentUser        = null;
 let currentWorkout     = null;
 let workoutPending     = false;
+let currentSleepHours  = null;
+let sleepPending       = false;
 let activeDate         = mskToday();
 let viewingPast        = false;
 
@@ -426,6 +428,78 @@ function attachStepsHandlers() {
   $('steps-save-btn')?.addEventListener('click', saveSteps);
 }
 
+/* ── Render: sleep section ─────────────────────────────────────────────── */
+function sleepHTML(hours, isPast) {
+  if (isPast) {
+    return `
+      <p class="section-label">Сон</p>
+      <div class="card sleep-card">
+        ${hours != null
+          ? `<div class="sleep-display"><span class="sleep-num">${hours}</span><span class="sleep-unit">ч</span></div>`
+          : `<p class="sleep-hint">Сон в этот день не записан.</p>`}
+      </div>`;
+  }
+
+  return `
+    <p class="section-label">Сон</p>
+    <div class="card sleep-card">
+      <div class="sleep-row">
+        <input class="sleep-input" id="sleep-input" type="number" inputmode="decimal"
+               step="0.1" min="0" max="24"
+               value="${hours != null ? hours : ''}" placeholder="—">
+        <span class="sleep-unit">ч</span>
+        <button class="sleep-save-btn" id="sleep-save-btn" type="button" aria-label="Сохранить">✓</button>
+      </div>
+      <p class="sleep-hint">Повторное сохранение за сегодня перезапишет значение.</p>
+    </div>`;
+}
+
+/* ── Sleep: save today's entry (upsert, overwrite-safe) ───────────────────── */
+async function saveSleep() {
+  if (sleepPending || viewingPast) return;
+
+  const input = $('sleep-input');
+  const val   = parseFloat(input?.value);
+
+  if (isNaN(val) || val < 0 || val > 24) {
+    const msg = 'Введи часы сна числом от 0 до 24.';
+    tg.showAlert ? tg.showAlert(msg) : alert(msg);
+    return;
+  }
+
+  sleepPending = true;
+  const btn = $('sleep-save-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '...'; }
+
+  try {
+    const res = await apiFetch('/api/sleep', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ userId, hours: val }),
+    });
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `HTTP ${res.status}`);
+
+    const { hours } = await res.json();
+    currentSleepHours = hours;
+    tg.HapticFeedback?.notificationOccurred?.('success');
+    $('sleep-section').innerHTML = sleepHTML(hours, false);
+    attachSleepHandlers();
+  } catch (err) {
+    console.error('[sleep] POST error:', err);
+    const msg = 'Не удалось сохранить сон. Попробуй ещё раз.';
+    tg.showAlert ? tg.showAlert(msg) : alert(msg);
+  } finally {
+    sleepPending = false;
+    const btnAgain = $('sleep-save-btn');
+    if (btnAgain) { btnAgain.disabled = false; btnAgain.textContent = '✓'; }
+  }
+}
+
+// Re-bind after every innerHTML replace — the button element is recreated each render
+function attachSleepHandlers() {
+  $('sleep-save-btn')?.addEventListener('click', saveSleep);
+}
+
 /* ── Render: workout section ───────────────────────────────────────────── */
 // Structured input (name + free-text detail) that assembles into the same
 // plain-text `description` the backend has always stored — no schema/API
@@ -597,7 +671,7 @@ function logCard(entry) {
 
 /* ── Main render ───────────────────────────────────────────────────────── */
 function render(data) {
-  const { user, logs, date, waterLogged, weightKg, steps, workout } = data;
+  const { user, logs, date, waterLogged, weightKg, steps, workout, sleepHours } = data;
   currentLogs        = logs;
   currentWaterLogged = waterLogged || 0;
   currentWaterTarget = user.target_water_ml || 2500;
@@ -605,6 +679,7 @@ function render(data) {
   currentSteps       = steps ?? null;
   currentUser        = user;
   currentWorkout     = workout ?? null;
+  currentSleepHours  = sleepHours ?? null;
 
   const totals = logs.reduce(
     (a, e) => ({
@@ -640,6 +715,9 @@ function render(data) {
 
   $('steps-section').innerHTML = stepsHTML(currentSteps, viewingPast);
   attachStepsHandlers();
+
+  $('sleep-section').innerHTML = sleepHTML(currentSleepHours, viewingPast);
+  attachSleepHandlers();
 
   $('workout-section').innerHTML = workoutHTML(currentWorkout, viewingPast);
   attachWorkoutHandlers();
@@ -685,6 +763,7 @@ function showError(msg) {
   $('water-section').innerHTML   = '';
   $('weight-section').innerHTML  = '';
   $('steps-section').innerHTML   = '';
+  $('sleep-section').innerHTML   = '';
   $('workout-section').innerHTML = '';
   $('log-section').innerHTML     = '';
 }

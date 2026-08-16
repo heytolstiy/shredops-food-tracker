@@ -80,6 +80,7 @@ bot.command('start', async (ctx) => {
       `/weight — записать/посмотреть вес\n` +
       `/steps — записать/посмотреть шаги\n` +
       `/workout — записать тренировку за сегодня\n` +
+      `/sleep — записать/посмотреть сон\n` +
       `/targets — изменить цели по КБЖУ\n` +
       `/week — отчёт за 7 дней (.md-файл)\n` +
       `/dashboard — открыть статистику\n` +
@@ -401,6 +402,88 @@ bot.command(['workout', 'тренировка'], async (ctx) => {
   return ctx.reply(`✅ Тренировка записана — ${today}`, { parse_mode: 'HTML' });
 });
 
+// ── /sleep — editable daily hours-of-sleep entry ───────────────────────────
+// Same overwrite-on-re-entry semantics as /weight and /steps: one value per
+// day, always today, upserted on re-entry.
+
+function parseSleepArg(text) {
+  const parts = text.trim().split(/\s+/);
+  return parts.length > 1 ? parts.slice(1).join(' ') : null;
+}
+
+bot.command(['sleep', 'сон'], async (ctx) => {
+  const telegramId = ctx.from.id;
+  const arg = parseSleepArg(ctx.message.text);
+
+  const { data: user, error: userError } = await supabase
+    .from('users')
+    .select('onboarding_complete')
+    .eq('telegram_id', telegramId)
+    .maybeSingle();
+
+  if (userError) {
+    console.error('[/sleep] user query error:', userError.message);
+    return ctx.reply('Что-то пошло не так. Попробуй ещё раз.');
+  }
+
+  if (!user?.onboarding_complete) {
+    return ctx.reply('Сначала заполни анкету — используй /start.');
+  }
+
+  // No argument — show today's recorded sleep
+  if (!arg) {
+    const today = todayMSK();
+
+    const { data: todayEntry, error } = await supabase
+      .from('sleep_logs')
+      .select('hours')
+      .eq('telegram_id', telegramId)
+      .eq('log_date', today)
+      .maybeSingle();
+
+    if (error) {
+      console.error('[/sleep] today-entry query error:', error.message);
+      return ctx.reply('Не удалось загрузить данные. Попробуй ещё раз.');
+    }
+
+    if (!todayEntry) {
+      return ctx.reply(
+        `😴 Сон за сегодня не записан.\n\n` +
+        `Чтобы записать: <code>/sleep 7.5</code>`,
+        { parse_mode: 'HTML' }
+      );
+    }
+
+    return ctx.reply(
+      `😴 Сегодня: <b>${todayEntry.hours}</b> ч.\n\n` +
+      `Обновить: <code>/sleep 7.5</code>`,
+      { parse_mode: 'HTML' }
+    );
+  }
+
+  // Argument given — validate and upsert today's entry
+  const hours = parseFloat(arg.replace(',', '.'));
+  if (isNaN(hours) || hours < 0 || hours > 24) {
+    return ctx.reply('⚠️ Введи часы сна числом от 0 до 24. Пример: <code>/sleep 7.5</code>', { parse_mode: 'HTML' });
+  }
+
+  const today = todayMSK();
+
+  const { error: upsertError } = await supabase
+    .from('sleep_logs')
+    .upsert(
+      { telegram_id: telegramId, log_date: today, hours, logged_at: new Date().toISOString() },
+      { onConflict: 'telegram_id,log_date' }
+    );
+
+  if (upsertError) {
+    console.error('[/sleep] upsert error:', upsertError.message);
+    return ctx.reply('❌ Не удалось сохранить сон. Попробуй ещё раз.');
+  }
+
+  return ctx.reply(`✅ Сон записан: <b>${hours}</b> ч — ${today}`, { parse_mode: 'HTML' });
+});
+
 // ── /targets — manual daily calorie/macro correction ───────────────────────
 // Direct override of users.daily_calories/daily_protein_g/daily_fat_g/
 // daily_carbs_g — bypasses calculateTDEE/calculateMacros entirely. This is
@@ -548,6 +631,9 @@ bot.command('help', (ctx) => ctx.reply(
   `🏋️ <b>Тренировка:</b>\n` +
   `<code>/workout Присед 3x10, Жим лёжа 3x8</code> — записать тренировку за сегодня текстом (повторный ввод перезаписывает)\n` +
   `<code>/workout</code> — посмотреть сегодняшнюю запись\n\n` +
+  `😴 <b>Сон:</b>\n` +
+  `<code>/sleep 7.5</code> — записать часы сна за сегодня (повторный ввод перезаписывает)\n` +
+  `<code>/sleep</code> — посмотреть сегодняшнее значение\n\n` +
   `🎯 <b>Цели по КБЖУ:</b>\n` +
   `<code>/targets 2000 175 70 180</code> — задать калории/белки/жиры/углеводы вручную (порядок именно такой)\n` +
   `<code>/targets</code> — посмотреть текущие цели\n\n` +
@@ -560,6 +646,7 @@ bot.command('help', (ctx) => ctx.reply(
   `/weight — вес\n` +
   `/steps — шаги\n` +
   `/workout — тренировка\n` +
+  `/sleep — сон\n` +
   `/targets — изменить цели\n` +
   `/week — отчёт за неделю`,
   { parse_mode: 'HTML' }

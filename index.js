@@ -114,7 +114,7 @@ app.get('/api/today/:userId', async (req, res) => {
 
   const today = todayMSK();
 
-  const [userResult, logsResult, waterResult, weightResult, stepsResult, workoutResult] = await Promise.all([
+  const [userResult, logsResult, waterResult, weightResult, stepsResult, workoutResult, sleepResult] = await Promise.all([
     supabase
       .from('users')
       .select('daily_calories, daily_protein_g, daily_fat_g, daily_carbs_g, first_name, username, goal, target_water_ml, current_streak, max_streak')
@@ -149,6 +149,12 @@ app.get('/api/today/:userId', async (req, res) => {
       .eq('telegram_id', userId)
       .eq('log_date', today)
       .maybeSingle(),
+    supabase
+      .from('sleep_logs')
+      .select('hours')
+      .eq('telegram_id', userId)
+      .eq('log_date', today)
+      .maybeSingle(),
   ]);
 
   if (!userResult.data) {
@@ -167,6 +173,7 @@ app.get('/api/today/:userId', async (req, res) => {
     weightKg:    weightResult.data?.weight_kg ?? null,
     steps:       stepsResult.data?.steps ?? null,
     workout:     workoutResult.data?.description ?? null,
+    sleepHours:  sleepResult.data?.hours ?? null,
   });
 });
 
@@ -300,6 +307,33 @@ app.post('/api/workout', async (req, res) => {
   res.json({ ok: true, description });
 });
 
+// POST — upsert today's hours of sleep (one value per day, overwrite on re-entry)
+app.post('/api/sleep', async (req, res) => {
+  const telegramId = parseInt(req.body.userId, 10);
+  const hours       = parseFloat(req.body.hours);
+
+  if (isNaN(telegramId)) return res.status(400).json({ error: 'Invalid userId' });
+  if (isNaN(hours) || hours < 0 || hours > 24) {
+    return res.status(400).json({ error: 'Invalid hours' });
+  }
+
+  const today = todayMSK();
+
+  const { error: upsertError } = await supabase
+    .from('sleep_logs')
+    .upsert(
+      { telegram_id: telegramId, log_date: today, hours, logged_at: new Date().toISOString() },
+      { onConflict: 'telegram_id,log_date' }
+    );
+
+  if (upsertError) {
+    console.error('[/api/sleep] upsert error:', upsertError.message);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+
+  res.json({ ok: true, hours });
+});
+
 // PUT — manually override daily calorie/macro targets (bypasses the
 // TDEE/macro-split calculator; this is direct user control, not a recalc).
 app.put('/api/targets', async (req, res) => {
@@ -367,7 +401,7 @@ app.get('/api/logs/:userId/:date', async (req, res) => {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ error: 'Invalid date format' });
   if (date > todayMSK()) return res.status(400).json({ error: 'Future date not allowed' });
 
-  const [userResult, logsResult, waterResult, weightResult, stepsResult, targetsResult, workoutResult] = await Promise.all([
+  const [userResult, logsResult, waterResult, weightResult, stepsResult, targetsResult, workoutResult, sleepResult] = await Promise.all([
     supabase
       .from('users')
       .select('daily_calories, daily_protein_g, daily_fat_g, daily_carbs_g, first_name, username, goal, target_water_ml, current_streak, max_streak')
@@ -408,6 +442,12 @@ app.get('/api/logs/:userId/:date', async (req, res) => {
       .eq('telegram_id', userId)
       .eq('log_date', date)
       .maybeSingle(),
+    supabase
+      .from('sleep_logs')
+      .select('hours')
+      .eq('telegram_id', userId)
+      .eq('log_date', date)
+      .maybeSingle(),
   ]);
 
   if (!userResult.data) return res.status(404).json({ error: 'User not found' });
@@ -440,6 +480,7 @@ app.get('/api/logs/:userId/:date', async (req, res) => {
     weightKg:    weightResult.data?.weight_kg ?? null,
     steps:       stepsResult.data?.steps ?? null,
     workout:     workoutResult.data?.description ?? null,
+    sleepHours:  sleepResult.data?.hours ?? null,
   });
 });
 
@@ -550,6 +591,7 @@ async function startBot(retries = 5) {
       { command: 'weight',    description: 'Записать/посмотреть вес' },
       { command: 'steps',     description: 'Записать/посмотреть шаги' },
       { command: 'workout',   description: 'Записать тренировку за сегодня' },
+      { command: 'sleep',     description: 'Записать/посмотреть сон' },
       { command: 'targets',   description: 'Изменить цели по КБЖУ' },
       { command: 'week',      description: 'Отчёт за 7 дней (.md)' },
       { command: 'help',      description: 'Справка по вводу' },
