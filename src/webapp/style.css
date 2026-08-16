@@ -306,6 +306,7 @@ body {
   flex-direction: column;
   gap: 6px;
   padding: 14px;
+  min-width: 0;
 }
 
 .mc-label {
@@ -589,6 +590,7 @@ body {
   gap: 12px;
   margin-bottom: 18px;
 }
+.modal-field { min-width: 0; }
 .modal-field--full { grid-column: 1 / -1; }
 
 .modal-label {
@@ -616,6 +618,7 @@ body {
 
 .modal-input {
   flex: 1;
+  min-width: 0;
   background: transparent;
   border: none;
   outline: none;
@@ -654,6 +657,7 @@ body {
   border-radius: 14px;
   border: none;
   cursor: pointer;
+  min-width: 0;
   transition: background 0.15s ease, transform 0.1s ease;
   -webkit-tap-highlight-color: transparent;
 }
@@ -782,6 +786,12 @@ body {
   grid-template-columns: 1fr 1fr;
   gap: var(--gap);
 }
+/* Grid items default to min-width:auto, sized off their content's
+   min-content — some Android WebView builds resolve that through nested
+   flex rows (the weight/steps input row) incorrectly and refuse to shrink
+   the column to its 1fr share, pushing the second column off-screen. This
+   forces the intended behavior everywhere. */
+.metric-pair > div { min-width: 0; }
 
 /* ── Weight section ───────────────────────────────────────────────────────── */
 .weight-row {
